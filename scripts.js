@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         flashDiscountMap = {};
         const { data, error } = await supabase
             .from('flash_offers')
-            .select('id, discount_percentage, ends_at, products ( name )')
+            .select('id, product_id, discount_percentage, ends_at, products ( name )')
             .eq('is_active', true)
             .gt('ends_at', new Date().toISOString())
             .order('ends_at', { ascending: true });
