@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productCategoryInput = document.getElementById('product-category');
     const productStockInput = document.getElementById('product-stock');
     const productImageInput = document.getElementById('product-image');
+    const productImageFileInput = document.getElementById('product-image-file');
+    const productImagePreview = document.getElementById('product-image-preview');
     const productIsOfferInput = document.getElementById('product-is-offer');
     const productIsNewInput = document.getElementById('product-is-new');
     const productNewCategoryContainer = document.getElementById('new-category-container');
@@ -81,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let editingProductId = null;
     let allOffers = [];
+    let pendingImageFile = null;
 
     // --- AUTH ---
     async function checkSession() {
@@ -343,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeProductModalBtn.addEventListener('click', closeProductModal);
     cancelProductBtn.addEventListener('click', closeProductModal);
     productForm.addEventListener('submit', saveProduct);
+    productImageFileInput.addEventListener('change', handleProductImageFile);
     productCategoryInput.addEventListener('change', () => {
         if (productCategoryInput.value === '__new__') {
             productNewCategoryContainer.style.display = 'block';
@@ -467,6 +471,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openProductModal(product) {
         editingProductId = product ? product.id : null;
+        pendingImageFile = null;
+        productImageFileInput.value = '';
+        productImagePreview.style.display = 'none';
+        productImagePreview.src = '';
         productModalTitle.textContent = product ? 'Editar Producto' : 'Nuevo Producto';
         productNameInput.value = product ? product.name : '';
         productDescriptionInput.value = product ? (product.description || '') : '';
@@ -478,10 +486,48 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCategoryOptions(product ? product.category : '');
         
         productStockInput.value = product ? (product.stock ?? 0) : 0;
-        productImageInput.value = product ? (product.image_path || '') : '';
+        productImageInput.value = product ? (product.image_path && !product.image_path.startsWith('http') ? '' : (product.image_path || '')) : '';
         productIsOfferInput.checked = product ? !!product.is_offer : false;
         productIsNewInput.checked = product ? !!product.is_new : false;
         productModal.style.display = 'flex';
+
+        // Vista previa de la imagen actual
+        const imgUrl = product ? getProductImageUrl(product.image_path) : null;
+        if (imgUrl) {
+            productImagePreview.src = imgUrl;
+            productImagePreview.style.display = 'block';
+        }
+    }
+
+    function handleProductImageFile() {
+        const file = productImageFileInput.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Selecciona un archivo de imagen válido.');
+            productImageFileInput.value = '';
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La imagen no puede superar 2 MB.');
+            productImageFileInput.value = '';
+            return;
+        }
+        pendingImageFile = file;
+        productImagePreview.src = URL.createObjectURL(file);
+        productImagePreview.style.display = 'block';
+        productImageInput.value = '';
+    }
+
+    async function uploadPendingImage() {
+        if (!pendingImageFile) return null;
+        const ext = (pendingImageFile.name.split('.').pop() || 'jpg').toLowerCase();
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+        const { error } = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: false });
+        if (error) {
+            console.error('Error subiendo imagen:', error);
+            throw new Error('No se pudo subir la imagen.');
+        }
+        return path;
     }
 
     function closeProductModal() {
@@ -502,6 +548,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        let imagePath = productImageInput.value.trim() || null;
+        if (pendingImageFile) {
+            try {
+                imagePath = await uploadPendingImage();
+            } catch (uploadError) {
+                alert(uploadError.message);
+                saveProductBtn.disabled = false;
+                return;
+            }
+        }
+
         const payload = {
             name: productNameInput.value.trim(),
             description: productDescriptionInput.value.trim() || null,
@@ -512,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
             is_new: productIsNewInput.checked,
             category: category || null,
             stock: parseInt(productStockInput.value) || 0,
-            image_path: productImageInput.value.trim() || null
+            image_path: imagePath
         };
 
         let error;
@@ -528,6 +585,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('No se pudo guardar el producto. Intenta de nuevo.');
             return;
         }
+        // Si se reemplazó la imagen, borrar la anterior de storage
+        if (pendingImageFile && editingProductId) {
+            const oldProduct = allProducts.find(p => p.id === editingProductId);
+            if (oldProduct && oldProduct.image_path && !oldProduct.image_path.startsWith('http')) {
+                supabase.storage.from('product-images').remove([oldProduct.image_path]);
+            }
+        }
+        pendingImageFile = null;
         closeProductModal();
         loadAdminProducts();
     }
@@ -539,6 +604,10 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error eliminando producto:', error);
             alert('No se pudo eliminar el producto. Intenta de nuevo.');
             return;
+        }
+        const removed = allProducts.find(p => p.id === id);
+        if (removed && removed.image_path && !removed.image_path.startsWith('http')) {
+            supabase.storage.from('product-images').remove([removed.image_path]);
         }
         loadAdminProducts();
     }
