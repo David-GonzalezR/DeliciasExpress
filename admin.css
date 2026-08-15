@@ -108,6 +108,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  height: 64px;
+  box-sizing: border-box;
 }
 .admin-logo {
   font-family: var(--fuente-logo);
@@ -430,4 +432,8 @@ body {
   .sidebar-btn { font-size: 0.8rem; padding: 0.5rem 0.4rem; gap: 0.35rem; }
   .productos-header { padding: 1rem 1rem 0.5rem; }
   .products-container { padding: 0 1rem; }
+  .form-row { flex-direction: column; gap: 0.85rem; }
+  .modal-overlay { padding: 0.75rem; }
+  .modal-box { max-height: 92vh; }
+  .modal-header, .product-form { padding-left: 1rem; padding-right: 1rem; }
 }
