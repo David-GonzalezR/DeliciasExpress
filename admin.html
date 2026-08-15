@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Pedidos - DeliciasExpress</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="login-screen" class="login-screen">
+        <form id="login-form" class="login-card">
+            <h1 class="login-logo">DeliciasExpress</h1>
+            <p class="login-subtitle">Panel de pedidos</p>
+            <label class="login-label" for="login-email">Correo</label>
+            <input id="login-email" class="login-input" type="email" autocomplete="username" required>
+            <label class="login-label" for="login-password">Contraseña</label>
+            <input id="login-password" class="login-input" type="password" autocomplete="current-password" required>
+            <button type="submit" id="login-submit-btn" class="btn btn-primary login-submit-btn">Entrar</button>
+            <p id="login-error" class="login-error"></p>
+        </form>
+    </div>
+
+    <!-- PANEL PRINCIPAL -->
+    <div id="dashboard" class="dashboard" style="display:none;">
+        <header class="admin-header">
+            <h1 class="admin-logo">DeliciasExpress <span>· Panel</span></h1>
+            <div class="admin-header-right">
+                <span id="realtime-indicator" class="realtime-indicator"><i class="fas fa-circle"></i> En vivo</span>
+                <button id="logout-btn" class="btn btn-secondary admin-logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</button>
+            </div>
+        </header>
+
+        <div class="admin-layout">
+            <aside class="admin-sidebar">
+                <button class="sidebar-btn active" data-view="pedidos"><i class="fas fa-receipt"></i> Pedidos</button>
+                <button class="sidebar-btn" data-view="productos"><i class="fas fa-utensils"></i> Productos</button>
+                <button class="sidebar-btn" data-view="ofertas"><i class="fas fa-bolt"></i> Ofertas</button>
+            </aside>
+
+            <div class="admin-content">
+                <section id="pedidos-view">
+                    <nav class="status-filter-bar">
+                        <button class="status-filter-btn active" data-status="activos">Activos</button>
+                        <button class="status-filter-btn" data-status="recibido">Recibidos</button>
+                        <button class="status-filter-btn" data-status="preparando">Preparando</button>
+                        <button class="status-filter-btn" data-status="despachado">Despachados</button>
+                        <button class="status-filter-btn" data-status="entregado">Entregados</button>
+                        <button class="status-filter-btn" data-status="cancelado">Cancelados</button>
+                        <button class="status-filter-btn" data-status="todos">Todos</button>
+                    </nav>
+
+                    <main id="orders-container" class="orders-container">
+                        <p id="orders-empty-message" class="orders-empty-message">Cargando pedidos...</p>
+                    </main>
+                </section>
+
+                <section id="productos-view" class="productos-view" style="display:none;">
+                    <div class="productos-header">
+                        <h2>Catálogo de Productos</h2>
+                        <button id="new-product-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Producto</button>
+                    </div>
+                    <main id="products-container" class="products-container">
+                        <p id="products-empty-message" class="orders-empty-message">Cargando productos...</p>
+                    </main>
+                </section>
+
+                <section id="ofertas-view" class="productos-view" style="display:none;">
+                    <div class="productos-header">
+                        <h2>Ofertas Relámpago</h2>
+                        <button id="new-offer-btn" class="btn btn-primary"><i class="fas fa-bolt"></i> Crear Nueva Oferta</button>
+                    </div>
+                    <main id="offers-container" class="products-container">
+                        <p id="offers-empty-message" class="orders-empty-message">Cargando ofertas...</p>
+                    </main>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE PRODUCTO -->
+    <div id="product-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="product-modal-title">Nuevo Producto</h3>
+                <button id="close-product-modal-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="product-form" class="product-form">
+                <label class="form-field">Nombre <input id="product-name" type="text" required></label>
+                <label class="form-field">Descripción corta <textarea id="product-description" rows="2"></textarea></label>
+                <label class="form-field">Descripción detallada <textarea id="product-detailed-description" rows="3"></textarea></label>
+                <div class="form-row">
+                    <label class="form-field">Precio <input id="product-price" type="number" min="0" step="any" required></label>
+                    <label class="form-field">Precio oferta <input id="product-offer-price" type="number" min="0" step="any"></label>
+                </div>
+                <div class="form-row">
+                    <label class="form-field">Categoría 
+                        <select id="product-category" required></select>
+                    </label>
+                    <label class="form-field">Stock <input id="product-stock" type="number" min="0" value="0"></label>
+                </div>
+                <div id="new-category-container" class="form-row" style="display:none; margin-top: -10px; margin-bottom: 10px;">
+                    <label class="form-field">Nueva Categoría <input id="product-new-category" type="text" placeholder="Ej: Bebidas, Postres"></label>
+                </div>
+                <label class="form-field">Imagen (URL) <input id="product-image" type="text" placeholder="https://ejemplo.com/foto.jpg"></label>
+                <div class="form-checks">
+                    <label class="check-label"><input id="product-is-offer" type="checkbox"> Es oferta</label>
+                    <label class="check-label"><input id="product-is-new" type="checkbox"> Es nuevo</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-product-btn" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="save-product-btn" class="btn btn-primary">Guardar Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE OFERTA RELÁMPAGO -->
+    <div id="offer-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Nueva Oferta Relámpago</h3>
+                <button id="close-offer-modal-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="offer-form" class="product-form">
+                <label class="form-field">Producto
+                    <select id="offer-product" required></select>
+                </label>
+                <div class="form-row">
+                    <label class="form-field">Descuento (%) <input id="offer-discount" type="number" min="1" max="100" required></label>
+                    <label class="form-field">Duración (minutos) <input id="offer-duration" type="number" min="1" value="60" required></label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-offer-btn" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="save-offer-btn" class="btn btn-primary">Crear Oferta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="admin.js" defer></script>
+</body>
+</html>
