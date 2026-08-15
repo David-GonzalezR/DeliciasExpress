@@ -763,6 +763,7 @@ select {
 }
 .cart-item-details {
   flex-grow: 1;
+  min-width: 0;
 }
 .cart-item-details h4 {
   font-weight: 600;
@@ -858,6 +859,18 @@ select {
 }
 #continue-shopping-btn {
   width: 100%;
+}
+
+/* Carrito en móvil: dos filas por ítem para evitar desbordes */
+@media (max-width: 480px) {
+  .modal { padding: 0.75rem; }
+  .cart-item { flex-wrap: wrap; }
+  .cart-item-img { width: 56px; height: 56px; }
+  .cart-item-details { flex-basis: calc(100% - 4.25rem); }
+  .cart-item-quantity-controls { order: 3; margin-top: 0.25rem; }
+  .cart-item-total-price { order: 4; margin-left: auto; width: auto; }
+  .cart-item-remove-btn { order: 5; }
+  .cart-item h4 { font-size: 0.9rem; word-break: break-word; }
 }
 
 /* NUEVO: Ícono para el botón de WhatsApp */
