@@ -143,17 +143,33 @@ select {
   background: none;
   border: none;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 .cart-icon-button:hover {
   color: var(--color-primario);
+  background: rgba(211, 47, 47, 0.08);
+}
+.share-app-btn {
+  color: #25d366;
+}
+.share-app-btn:hover {
+  color: #1da851;
+  background: rgba(37, 211, 102, 0.12);
 }
 .cart-icon-button .fa-shopping-cart {
-  font-size: 1.5rem; /* text-2xl */
+  font-size: 1.6rem; /* text-2xl */
 }
 .cart-count {
   position: absolute;
-  top: -0.5rem; /* -top-2 */
-  right: -0.5rem; /* -right-2 */
+  top: 2px;
+  right: 2px;
   background-color: var(--color-secundario);
   color: var(--color-primario);
   font-size: 0.75rem; /* text-xs */
@@ -224,31 +240,14 @@ select {
   max-width: 42rem; /* max-w-2xl */
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
-.hero-actions {
+.hero-view-menu-btn {
   position: absolute;
   bottom: 4rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-index-hero-boton);
-  display: flex;
-  gap: var(--espaciado-3);
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.hero-view-menu-btn {
   padding: var(--espaciado-3) var(--espaciado-8);
   font-size: 1.125rem; /* text-lg */
-}
-.hero-share-btn {
-  background-color: #25d366;
-  color: #fff;
-  padding: var(--espaciado-3) var(--espaciado-6);
-  font-size: 1.125rem; /* text-lg */
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: var(--sombra-suave);
 }
 
 /* Category Bar */

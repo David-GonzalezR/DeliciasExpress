@@ -22,7 +22,7 @@
         <div class="container">
             <h1 class="logo-text">DeliciasExpress</h1>
             <div class="header-actions" style="display:flex; align-items:center; gap:0.5rem; position:relative;">
-                <button id="user-menu-button" class="cart-icon-button transition-all-smooth">
+                <button id="user-menu-button" class="cart-icon-button transition-all-smooth" title="Mi cuenta">
                     <i class="fas fa-user-circle"></i>
                 </button>
                 <!-- Dropdown de usuario logueado -->
@@ -35,7 +35,10 @@
                         <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
                     </button>
                 </div>
-                <button id="track-order-button" class="cart-icon-button transition-all-smooth" style="display:none;">
+                <button id="share-app-btn" class="cart-icon-button share-app-btn transition-all-smooth" title="Compartir DeliciasExpress" aria-label="Compartir">
+                    <i class="fab fa-whatsapp"></i>
+                </button>
+                <button id="track-order-button" class="cart-icon-button transition-all-smooth" style="display:none;" title="Seguir mi pedido">
                     <i class="fas fa-receipt"></i>
                 </button>
                 <button id="cart-icon-button" class="cart-icon-button transition-all-smooth">
@@ -47,14 +50,9 @@
     </header>
 
     <section id="hero-section" class="hero-section">
-        <div class="hero-actions">
-            <button id="view-menu-hero-btn" class="btn btn-primary hero-view-menu-btn transform-hover-scale-105 transition-all-smooth">
-                Ver Menú
-            </button>
-            <button id="share-app-btn" class="btn hero-share-btn transform-hover-scale-105 transition-all-smooth">
-                <i class="fab fa-whatsapp"></i> Compartir
-            </button>
-        </div>
+        <button id="view-menu-hero-btn" class="btn btn-primary hero-view-menu-btn transform-hover-scale-105 transition-all-smooth">
+            Ver Menú
+        </button>
     </section>
 
     <nav id="category-bar" class="category-bar">
