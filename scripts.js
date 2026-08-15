@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const flashBannerTimer = document.getElementById('flash-banner-timer');
     const flashBannerClose = document.getElementById('flash-banner-close');
 
+    // Compartir
+    const shareAppBtn = document.getElementById('share-app-btn');
+
     // Autenticación (DOM)
     const authModal = document.getElementById('auth-modal');
     const closeAuthModalBtn = document.getElementById('close-auth-modal-btn');
@@ -1055,6 +1058,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         checkoutBtn.addEventListener('click', sendOrderViaWhatsApp);
+
+        shareAppBtn.addEventListener('click', () => {
+            const message = '¡Vengan a probar la comida más rica de DeliciasExpress! 🍔🍕🔥 Hamburguesas, pizza, ensaladas y mucho más, todo delicioso y a un clic de distancia. ¡Los esperamos! 😋\n\n' + window.location.href;
+            if (navigator.share) {
+                navigator.share({ title: 'DeliciasExpress', text: message, url: window.location.href }).catch(() => {});
+            } else {
+                window.open('https://wa.me/?text=' + encodeURIComponent(message), '_blank');
+            }
+        });
     }
 
     // --- AUTENTICACIÓN ---
