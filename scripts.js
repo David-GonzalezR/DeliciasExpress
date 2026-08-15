@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const orderStatusModal = document.getElementById('order-status-modal');
     const closeOrderStatusModalBtn = document.getElementById('close-order-status-modal-btn');
     const orderStatusShortId = document.getElementById('order-status-short-id');
+    const orderStatusTotal = document.getElementById('order-status-total');
     const orderStatusTimeline = document.getElementById('order-status-timeline');
     const orderStatusCancelledMsg = document.getElementById('order-status-cancelled-msg');
     const orderStatusList = document.getElementById('order-status-list');
@@ -116,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelado: 'Cancelado'
     };
     const orderStatuses = {};
+    const orderTotals = {};
 
     // --- INICIALIZACIÓN ---
     function initialize() {
@@ -774,6 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data, error } = await supabase.rpc('get_order_status', { order_id: id });
             if (!error && data && data.length > 0) {
                 orderStatuses[id] = data[0].status;
+                orderTotals[id] = data[0].total;
             }
         }
         renderOrderStatusList();
@@ -788,14 +791,19 @@ document.addEventListener('DOMContentLoaded', () => {
             orderStatusTimeline.style.display = 'none';
             orderStatusCancelledMsg.style.display = 'none';
             orderStatusShortId.textContent = '';
+            orderStatusTotal.textContent = '';
             updateConfirmReceiptButton();
             return;
         }
         orderStatusList.innerHTML = trackedOrderIds.map(id => {
             const status = orderStatuses[id] || 'recibido';
             const label = ORDER_STATUS_LABELS[status] || status;
+            const total = orderTotals[id];
             return `<button type="button" class="tracked-order-item${id === selectedOrderId ? ' active' : ''}" data-order-id="${id}">
-                <span class="tracked-order-id">Pedido #${id.slice(0, 8).toUpperCase()}</span>
+                <span class="tracked-order-info">
+                    <span class="tracked-order-id">Pedido #${id.slice(0, 8).toUpperCase()}</span>
+                    ${total ? `<span class="tracked-order-total">${formatPrice(total)}</span>` : ''}
+                </span>
                 <span class="tracked-order-status">${label}</span>
             </button>`;
         }).join('');
@@ -817,6 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { data, error } = await supabase.rpc('get_order_status', { order_id: orderId });
         if (!error && data && data.length > 0) {
             orderStatuses[orderId] = data[0].status;
+            orderTotals[orderId] = data[0].total;
             renderOrderStatusList();
             if (selectedOrderId === orderId) {
                 renderOrderStatus(data[0].status, orderId);
@@ -842,6 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderOrderStatus(status, orderId) {
         orderStatusShortId.textContent = orderId.slice(0, 8).toUpperCase();
+        orderStatusTotal.textContent = orderTotals[orderId] ? formatPrice(orderTotals[orderId]) : '';
 
         if (status === 'cancelado') {
             orderStatusTimeline.style.display = 'none';

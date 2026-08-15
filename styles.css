@@ -1133,10 +1133,21 @@ font-size: 0.9rem;
     border-color: var(--color-primario);
     background: color-mix(in srgb, var(--color-primario) 8%, white);
 }
+.tracked-order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 .tracked-order-id {
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--color-texto-principal);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-texto-principal);
+}
+.tracked-order-total {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primario);
 }
 .tracked-order-status {
     font-size: 0.8rem;
