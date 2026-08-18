@@ -84,13 +84,14 @@
                 <section id="domiciliarios-view" class="productos-view" style="display:none;">
                     <div class="productos-header">
                         <h2>Domiciliarios</h2>
+                        <button id="new-rider-btn" class="btn btn-primary"><i class="fas fa-motorcycle"></i> Crear domiciliario</button>
                     </div>
                     <div class="riders-promote-row">
                         <label class="form-field" style="flex:1;">
-                            Buscar usuario por correo para convertir en domiciliario
+                            Promover usuario existente (por correo)
                             <input id="rider-search-email" type="email" placeholder="correo@ejemplo.com">
                         </label>
-                        <button id="rider-promote-btn" class="btn btn-primary"><i class="fas fa-user-plus"></i> Convertir en domiciliario</button>
+                        <button id="rider-promote-btn" class="btn btn-secondary"><i class="fas fa-user-check"></i> Asignar rol</button>
                     </div>
                     <main id="riders-container" class="products-container">
                         <p id="riders-empty-message" class="orders-empty-message">Cargando domiciliarios...</p>
@@ -159,6 +160,47 @@
                 <div class="modal-actions">
                     <button type="button" id="cancel-offer-btn" class="btn btn-secondary">Cancelar</button>
                     <button type="submit" id="save-offer-btn" class="btn btn-primary">Crear Oferta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CREAR DOMICILIARIO -->
+    <div id="rider-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fas fa-motorcycle"></i> Crear nuevo domiciliario</h3>
+                <button id="close-rider-modal-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="rider-form" class="product-form">
+                <div class="form-row">
+                    <label class="form-field">
+                        Nombre completo
+                        <input id="rider-name" type="text" placeholder="Ej: Juan Pérez" required>
+                    </label>
+                    <label class="form-field">
+                        Teléfono
+                        <input id="rider-phone" type="tel" placeholder="Ej: 3001234567">
+                    </label>
+                </div>
+                <label class="form-field">
+                    Correo electrónico
+                    <input id="rider-email" type="email" placeholder="domiciliario@ejemplo.com" required>
+                </label>
+                <label class="form-field">
+                    Contraseña temporal
+                    <div class="password-field-wrapper">
+                        <input id="rider-password" type="password" placeholder="Mínimo 6 caracteres" minlength="6" required>
+                        <button type="button" id="toggle-rider-password" class="btn-icon-toggle" title="Mostrar/ocultar">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <small class="form-hint">El domiciliario puede cambiarla después desde su perfil.</small>
+                </label>
+                <p id="rider-form-error" class="login-error" style="margin-top:0;"></p>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-rider-btn" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="save-rider-btn" class="btn btn-primary"><i class="fas fa-user-plus"></i> Crear cuenta</button>
                 </div>
             </form>
         </div>

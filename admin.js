@@ -84,6 +84,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const riderPromoteBtn = document.getElementById('rider-promote-btn');
     const ridersContainer = document.getElementById('riders-container');
     const ridersEmptyMessage = document.getElementById('riders-empty-message');
+    // Modal crear domiciliario
+    const newRiderBtn = document.getElementById('new-rider-btn');
+    const riderModal = document.getElementById('rider-modal');
+    const riderForm = document.getElementById('rider-form');
+    const riderNameInput = document.getElementById('rider-name');
+    const riderPhoneInput = document.getElementById('rider-phone');
+    const riderEmailInput = document.getElementById('rider-email');
+    const riderPasswordInput = document.getElementById('rider-password');
+    const toggleRiderPasswordBtn = document.getElementById('toggle-rider-password');
+    const riderFormError = document.getElementById('rider-form-error');
+    const saveRiderBtn = document.getElementById('save-rider-btn');
+    const cancelRiderBtn = document.getElementById('cancel-rider-btn');
+    const closeRiderModalBtn = document.getElementById('close-rider-modal-btn');
 
     let allOrders = [];
     let currentFilter = 'activos';
@@ -469,6 +482,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Modal crear domiciliario
+    newRiderBtn.addEventListener('click', () => openRiderModal());
+    closeRiderModalBtn.addEventListener('click', closeRiderModal);
+    cancelRiderBtn.addEventListener('click', closeRiderModal);
+    riderModal.addEventListener('click', (e) => { if (e.target === riderModal) closeRiderModal(); });
+    riderForm.addEventListener('submit', createRider);
+    toggleRiderPasswordBtn.addEventListener('click', () => {
+        const isText = riderPasswordInput.type === 'text';
+        riderPasswordInput.type = isText ? 'password' : 'text';
+        toggleRiderPasswordBtn.querySelector('i').className = isText ? 'fas fa-eye' : 'fas fa-eye-slash';
+    });
+
     // --- NAVEGACIÓN ENTRE VISTAS ---
     function showView(view) {
         sidebarButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
@@ -583,6 +608,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         loadRiders();
     });
+
+    function openRiderModal() {
+        riderForm.reset();
+        riderFormError.textContent = '';
+        riderPasswordInput.type = 'password';
+        toggleRiderPasswordBtn.querySelector('i').className = 'fas fa-eye';
+        riderModal.style.display = 'flex';
+        riderNameInput.focus();
+    }
+
+    function closeRiderModal() {
+        riderModal.style.display = 'none';
+    }
+
+    async function createRider(e) {
+        e.preventDefault();
+        riderFormError.textContent = '';
+        saveRiderBtn.disabled = true;
+        saveRiderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+
+        const name = riderNameInput.value.trim();
+        const phone = riderPhoneInput.value.trim();
+        const email = riderEmailInput.value.trim();
+        const password = riderPasswordInput.value;
+
+        // 1. Crear la cuenta en auth.users
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { full_name: name }
+            }
+        });
+
+        if (signUpError) {
+            riderFormError.textContent = signUpError.message.includes('already registered')
+                ? 'Ya existe una cuenta con ese correo. Usa la opción "Promover usuario existente".' 
+                : `Error al crear la cuenta: ${signUpError.message}`;
+            saveRiderBtn.disabled = false;
+            saveRiderBtn.innerHTML = '<i class="fas fa-user-plus"></i> Crear cuenta';
+            return;
+        }
+
+        const userId = signUpData.user?.id;
+        if (!userId) {
+            riderFormError.textContent = 'La cuenta fue creada pero el servidor no devolvió el ID. Asigna el rol manualmente desde Supabase.';
+            saveRiderBtn.disabled = false;
+            saveRiderBtn.innerHTML = '<i class="fas fa-user-plus"></i> Crear cuenta';
+            return;
+        }
+
+        // 2. Actualizar (o insertar) el perfil con rol domiciliario
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+                id: userId,
+                role: 'domiciliario',
+                full_name: name,
+                phone: phone || null,
+                email: email,
+                is_available: false
+            }, { onConflict: 'id' });
+
+        saveRiderBtn.disabled = false;
+        saveRiderBtn.innerHTML = '<i class="fas fa-user-plus"></i> Crear cuenta';
+
+        if (profileError) {
+            console.error('Error asignando perfil:', profileError);
+            riderFormError.textContent = 'Cuenta creada, pero no se pudo asignar el rol automáticamente. Ve a Supabase y ponle role="domiciliario" al usuario ' + email + '.';
+            return;
+        }
+
+        closeRiderModal();
+        loadRiders();
+        alert(`✅ Domiciliario "${name}" creado correctamente. Ya puede iniciar sesión en el panel de domiciliarios con ${email}.`);
+    }
 
     // --- CRUD DE PRODUCTOS ---
     async function loadAdminProducts() {

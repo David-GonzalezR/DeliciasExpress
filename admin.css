@@ -494,6 +494,53 @@ body {
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.4rem; }
 
+/* --- PASSWORD FIELD CON TOGGLE --- */
+.password-field-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-field-wrapper input {
+  flex: 1;
+  padding-right: 2.8rem;
+}
+.btn-icon-toggle {
+  position: absolute;
+  right: 0.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-texto-secundario);
+  font-size: 1rem;
+  padding: 0.25rem;
+  transition: color 0.15s;
+}
+.btn-icon-toggle:hover { color: var(--color-primario); }
+
+.form-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-texto-secundario);
+  margin-top: 0.35rem;
+}
+
+/* --- RIDERS PROMOTE ROW --- */
+.riders-promote-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem 1rem;
+  background: var(--color-fondo-tarjeta);
+  border-bottom: 1px solid var(--color-borde);
+  flex-wrap: wrap;
+}
+.riders-promote-row .form-field {
+  margin-bottom: 0;
+}
+.riders-promote-row .form-field input {
+  min-width: 240px;
+}
+
 @media (max-width: 768px) {
   .admin-layout { flex-direction: column; }
   .admin-sidebar {
