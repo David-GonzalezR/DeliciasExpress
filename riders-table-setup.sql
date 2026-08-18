@@ -56,6 +56,45 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('rider-photos', 'rider-photos', true)
 ON CONFLICT DO NOTHING;
 
+-- Políticas de storage: solo el propio rider (o un admin) sube/edita su foto.
+-- El archivo se sube como "<userId>.<ext>", por eso se compara la primera parte del nombre.
+CREATE POLICY "Rider o admin suben fotos"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'rider-photos'
+    AND (
+      public.get_user_role() = 'admin'
+      OR (string_to_array(name, '.'))[1] = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Rider o admin actualizan fotos"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'rider-photos'
+    AND (
+      public.get_user_role() = 'admin'
+      OR (string_to_array(name, '.'))[1] = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Rider o admin eliminan fotos"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'rider-photos'
+    AND (
+      public.get_user_role() = 'admin'
+      OR (string_to_array(name, '.'))[1] = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Lectura pública fotos riders"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'rider-photos');
+
 -- ================================================================
 -- RPC: get_order_rider_info — datos públicos del domiciliario
 -- ================================================================
