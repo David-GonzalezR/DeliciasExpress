@@ -8,18 +8,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
 
     // --- STATUS FLOW ---
-    const STATUS_FLOW = ['recibido', 'preparando', 'despachado', 'entregado'];
+    const STATUS_FLOW = ['recibido', 'preparando'];
     const STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
         despachado: 'Despachado',
+        buscando_domiciliario: 'Buscando domiciliario',
+        en_camino: 'En camino',
         entregado: 'Entregado',
         cancelado: 'Cancelado'
     };
     const NEXT_ACTION_LABEL = {
         recibido: 'Marcar Preparando',
-        preparando: 'Marcar Despachado',
-        despachado: 'Marcar Entregado'
+        preparando: 'Marcar Despachado'
     };
 
     // --- DOM ---
@@ -77,6 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelOfferBtn = document.getElementById('cancel-offer-btn');
     const saveOfferBtn = document.getElementById('save-offer-btn');
 
+    // Domiciliarios
+    const domiciliariosView = document.getElementById('domiciliarios-view');
+    const riderSearchEmail = document.getElementById('rider-search-email');
+    const riderPromoteBtn = document.getElementById('rider-promote-btn');
+    const ridersContainer = document.getElementById('riders-container');
+    const ridersEmptyMessage = document.getElementById('riders-empty-message');
+
     let allOrders = [];
     let currentFilter = 'activos';
     let ordersChannel = null;
@@ -84,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let editingProductId = null;
     let allOffers = [];
     let pendingImageFile = null;
+    let riderNamesCache = {};
 
     // --- AUTH ---
     async function checkSession() {
@@ -159,6 +168,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- CARGA DE PEDIDOS ---
+    async function loadRiderNames(riderIds) {
+        const unique = [...new Set((riderIds || []).filter(Boolean))].filter(id => !riderNamesCache[id]);
+        if (unique.length === 0) return;
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', unique);
+        if (!error && data) {
+            data.forEach(p => { riderNamesCache[p.id] = p.full_name || 'Domiciliario'; });
+        }
+    }
+
     async function loadOrders() {
         ordersEmptyMessage.style.display = 'block';
         ordersEmptyMessage.textContent = 'Cargando pedidos...';
@@ -167,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .from('orders')
             .select(`
                 id, delivery_address, status, total, created_at,
+                assigned_rider_id, delivery_requested_at, delivered_at,
+                delivery_lat, delivery_lng, customer_phone,
                 order_items ( id, product_name, quantity, unit_price, customizations, instructions )
             `)
             .order('created_at', { ascending: false })
@@ -179,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         allOrders = data || [];
+        await loadRiderNames(allOrders.map(o => o.assigned_rider_id));
         renderOrders();
     }
 
@@ -204,6 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (idx !== -1) {
                     allOrders[idx] = { ...allOrders[idx], ...payload.new };
                     renderOrders();
+                    if (payload.new.assigned_rider_id && !riderNamesCache[payload.new.assigned_rider_id]) {
+                        loadRiderNames([payload.new.assigned_rider_id]).then(() => renderOrders());
+                    }
                 }
             })
             .subscribe();
@@ -236,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getFilteredOrders() {
         if (currentFilter === 'todos') return allOrders;
-        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'despachado'].includes(o.status));
+        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'despachado', 'buscando_domiciliario', 'en_camino'].includes(o.status));
         return allOrders.filter(o => o.status === currentFilter);
     }
 
@@ -276,12 +303,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         let actionsHtml = '';
-        if (STATUS_FLOW.includes(order.status) && order.status !== 'entregado') {
+        if (STATUS_FLOW.includes(order.status)) {
             actionsHtml += `<button class="btn btn-status-advance" data-action="advance" data-id="${order.id}" data-current="${order.status}">${NEXT_ACTION_LABEL[order.status]}</button>`;
+        }
+        if (order.status === 'despachado') {
+            actionsHtml += `<button class="btn btn-status-advance" data-action="request-delivery" data-id="${order.id}">
+                <i class="fas fa-motorcycle"></i> Pedir Domicilio
+            </button>`;
+        }
+        if (order.status === 'buscando_domiciliario' && !order.assigned_rider_id) {
+            actionsHtml += `<button class="btn btn-status-cancel" data-action="cancel-delivery-request" data-id="${order.id}">Cancelar solicitud de domicilio</button>`;
         }
         if (order.status !== 'entregado' && order.status !== 'cancelado') {
             actionsHtml += `<button class="btn btn-status-cancel" data-action="cancel" data-id="${order.id}">Cancelar</button>`;
         }
+
+        const riderInfo = order.assigned_rider_id
+            ? `<div class="order-card-rider"><i class="fas fa-motorcycle"></i> ${riderNamesCache[order.assigned_rider_id] || 'Domiciliario asignado'}</div>`
+            : '';
+        const phoneInfo = order.customer_phone
+            ? `<div class="order-card-rider"><i class="fas fa-phone"></i> ${order.customer_phone}</div>`
+            : '';
+        const mapsLink = buildMapsLink(order);
 
         card.innerHTML = `
             <div class="order-card-header">
@@ -292,11 +335,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="order-status-badge">${STATUS_LABELS[order.status] || order.status}</span>
             </div>
             <div class="order-card-address"><i class="fas fa-location-dot"></i> ${order.delivery_address}</div>
+            ${riderInfo}
+            ${phoneInfo}
             <ul class="order-card-items">${itemsHtml}</ul>
             <div class="order-card-total"><span>Total</span><span>${formatPrice(order.total)}</span></div>
             <div class="order-card-actions">${actionsHtml}</div>
+            ${mapsLink ? `<div class="order-card-actions"><a class="btn btn-secondary" href="${mapsLink}" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Ver en Google Maps</a></div>` : ''}
         `;
         return card;
+    }
+
+    function buildMapsLink(order) {
+        if (order.delivery_lat && order.delivery_lng) {
+            return `https://www.google.com/maps?q=${order.delivery_lat},${order.delivery_lng}`;
+        }
+        if (order.delivery_address) {
+            return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`;
+        }
+        return null;
     }
 
     // --- ACCIONES SOBRE PEDIDOS ---
@@ -311,6 +367,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentStatus = btn.dataset.current;
             const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(currentStatus) + 1];
             await updateOrderStatus(orderId, nextStatus);
+        } else if (btn.dataset.action === 'request-delivery') {
+            const { data, error } = await supabase.rpc('request_delivery', { p_order_id: orderId });
+            if (error || !(data && data.ok)) {
+                alert('No se pudo solicitar el domiciliario. Intenta de nuevo.');
+                btn.disabled = false;
+                return;
+            }
+            const idx = allOrders.findIndex(o => o.id === orderId);
+            if (idx !== -1) { allOrders[idx].status = 'buscando_domiciliario'; renderOrders(); }
+        } else if (btn.dataset.action === 'cancel-delivery-request') {
+            if (!confirm('¿Cancelar la solicitud de domicilio? El pedido volverá a "Despachado".')) {
+                btn.disabled = false;
+                return;
+            }
+            const { data, error } = await supabase.rpc('cancel_delivery_request', { p_order_id: orderId });
+            if (error || !(data && data.ok)) {
+                alert('No se pudo cancelar la solicitud. Intenta de nuevo.');
+                btn.disabled = false;
+                return;
+            }
+            const idx = allOrders.findIndex(o => o.id === orderId);
+            if (idx !== -1) { allOrders[idx].status = 'despachado'; allOrders[idx].delivery_requested_at = null; renderOrders(); }
         } else if (btn.dataset.action === 'cancel') {
             if (confirm('¿Cancelar este pedido?')) {
                 await updateOrderStatus(orderId, 'cancelado');
@@ -340,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showView(btn.dataset.view);
             if (btn.dataset.view === 'productos' && allProducts.length === 0) loadAdminProducts();
             if (btn.dataset.view === 'ofertas' && allOffers.length === 0) loadOffers();
+            if (btn.dataset.view === 'domiciliarios') loadRiders();
         });
     });
     newProductBtn.addEventListener('click', () => openProductModal(null));
@@ -396,7 +475,114 @@ document.addEventListener('DOMContentLoaded', () => {
         pedidosView.style.display = view === 'pedidos' ? 'block' : 'none';
         productosView.style.display = view === 'productos' ? 'block' : 'none';
         ofertasView.style.display = view === 'ofertas' ? 'block' : 'none';
+        domiciliariosView.style.display = view === 'domiciliarios' ? 'block' : 'none';
     }
+
+    // --- GESTIÓN DE DOMICILIARIOS ---
+    async function loadRiders() {
+        ridersEmptyMessage.style.display = 'block';
+        ridersEmptyMessage.textContent = 'Cargando domiciliarios...';
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, phone, email, is_available, role')
+            .eq('role', 'domiciliario');
+
+        if (error) {
+            console.error('Error cargando domiciliarios:', error);
+            ridersEmptyMessage.textContent = 'No se pudieron cargar los domiciliarios.';
+            return;
+        }
+
+        ridersContainer.querySelectorAll('.product-card').forEach(el => el.remove());
+        if (!data || data.length === 0) {
+            ridersEmptyMessage.style.display = 'block';
+            ridersEmptyMessage.textContent = 'No hay domiciliarios. Promueve a un usuario registrado con su correo.';
+            return;
+        }
+        ridersEmptyMessage.style.display = 'none';
+        data.forEach(rider => ridersContainer.appendChild(buildRiderCard(rider)));
+    }
+
+    function buildRiderCard(rider) {
+        const card = document.createElement('div');
+        card.className = 'product-card rider-card';
+
+        const availabilityBadge = rider.is_available
+            ? '<span class="product-badge product-badge-offer">Disponible</span>'
+            : '<span class="product-badge product-badge-new">No disponible</span>';
+
+        card.innerHTML = `
+            <div class="product-card-body">
+                <h4 class="product-card-name"><i class="fas fa-motorcycle"></i> ${rider.full_name || 'Sin nombre'}</h4>
+                <div class="product-badges">${availabilityBadge}</div>
+                <span class="product-card-stock">${rider.phone ? `<i class="fas fa-phone"></i> ${rider.phone}` : 'Sin teléfono registrado'}</span>
+                <span class="product-card-stock">${rider.email ? `<i class="fas fa-envelope"></i> ${rider.email}` : 'Sin correo registrado'}</span>
+                <div class="product-actions">
+                    <button class="btn btn-delete" data-action="demote-rider" data-id="${rider.id}"><i class="fas fa-user-minus"></i> Quitar rol de domiciliario</button>
+                </div>
+            </div>
+        `;
+        return card;
+    }
+
+    riderPromoteBtn.addEventListener('click', async () => {
+        const email = riderSearchEmail.value.trim();
+        if (!email) {
+            alert('Escribe el correo del usuario a promover.');
+            return;
+        }
+        riderPromoteBtn.disabled = true;
+
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('id, role')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (error || !profile) {
+            riderPromoteBtn.disabled = false;
+            alert('No existe un usuario registrado con ese correo.');
+            return;
+        }
+        if (profile.role === 'domiciliario') {
+            riderPromoteBtn.disabled = false;
+            alert('Ese usuario ya es domiciliario.');
+            return;
+        }
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ role: 'domiciliario' })
+            .eq('id', profile.id);
+
+        riderPromoteBtn.disabled = false;
+        if (updateError) {
+            console.error('Error promoviendo usuario:', updateError);
+            alert('No se pudo asignar el rol. Verifica que tengas permisos de administrador.');
+            return;
+        }
+        riderSearchEmail.value = '';
+        loadRiders();
+    });
+
+    ridersContainer.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn || btn.dataset.action !== 'demote-rider') return;
+        if (!confirm('¿Quitar el rol de domiciliario a este usuario? Volverá a ser cliente.')) return;
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ role: 'cliente' })
+            .eq('id', btn.dataset.id);
+
+        if (error) {
+            console.error('Error quitando rol:', error);
+            alert('No se pudo quitar el rol. Intenta de nuevo.');
+            return;
+        }
+        loadRiders();
+    });
 
     // --- CRUD DE PRODUCTOS ---
     async function loadAdminProducts() {

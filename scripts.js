@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkoutBtn = document.getElementById('checkout-btn');
     const clearCartBtn = document.getElementById('clear-cart-btn');
     const deliveryAddressInput = document.getElementById('delivery-address');
+    const useGpsBtn = document.getElementById('use-gps-btn');
+    const gpsStatus = document.getElementById('gps-status');
+    const customerPhoneInput = document.getElementById('customer-phone');
 
     // Alerta Personalizada
     const customAlert = document.getElementById('custom-alert');
@@ -107,8 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSignupMode = false;
     let flashDiscountMap = {};
     let flashTimerInterval = null;
+    let capturedLat = null;
+    let capturedLng = null;
 
     const ORDER_STATUS_STEPS = ['recibido', 'preparando', 'despachado', 'entregado'];
+    const TRACK_STATUS_MAP = { buscando_domiciliario: 'despachado', en_camino: 'despachado' };
     const ORDER_STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
@@ -681,6 +687,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- GUARDAR PEDIDO EN SUPABASE Y ENVIAR POR WHATSAPP ---
+    function captureGpsLocation() {
+        if (!navigator.geolocation) {
+            gpsStatus.textContent = 'Tu navegador no soporta geolocalización.';
+            return;
+        }
+        gpsStatus.textContent = 'Obteniendo ubicación...';
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                capturedLat = pos.coords.latitude;
+                capturedLng = pos.coords.longitude;
+                gpsStatus.textContent = 'Ubicación capturada. Se enviará junto con tu dirección.';
+                useGpsBtn.innerHTML = '<i class="fas fa-check-circle"></i> Ubicación capturada';
+            },
+            (err) => {
+                gpsStatus.textContent = 'No se pudo obtener tu ubicación. Puedes seguir solo con la dirección escrita.';
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
     async function sendOrderViaWhatsApp() {
         const address = deliveryAddressInput.value.trim();
         if (cart.length === 0) {
@@ -711,40 +737,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const { data: orderId, error: orderError } = await supabase.rpc('create_order', {
                 p_delivery_address: address,
                 p_total: total,
-                p_items: orderItemsPayload
+                p_items: orderItemsPayload,
+                p_lat: capturedLat,
+                p_lng: capturedLng,
+                p_customer_phone: customerPhoneInput ? customerPhoneInput.value.trim() : null
             });
+
+            if (orderError && orderError.message && /argument|signature|function/i.test(orderError.message)) {
+                const { data: fallbackId, error: fallbackError } = await supabase.rpc('create_order', {
+                    p_delivery_address: address,
+                    p_total: total,
+                    p_items: orderItemsPayload
+                });
+                if (fallbackError) throw fallbackError;
+                return continueOrderFlow(fallbackId, address, total, cart);
+            }
 
             if (orderError) throw orderError;
 
-            const shortId = orderId.slice(0, 8).toUpperCase();
-            let message = `¡Hola! 👋 Quiero confirmar mi pedido *#${shortId}*:\n\n`;
-            message += `*DIRECCIÓN DE ENTREGA:*\n${address}\n\n`;
-            message += `*PEDIDO:*\n`;
-            cart.forEach(item => {
-                message += `*${item.quantity}x - ${item.name}* (${formatPrice(item.finalPricePerUnit)})\n`;
-                if (item.selectedCustomizations.length > 0) {
-                    message += `  - Extras: ${item.selectedCustomizations.map(c => c.name).join(', ')}\n`;
-                }
-                if (item.instructions) {
-                    message += `  - Instrucciones: ${item.instructions}\n`;
-                }
-                message += `\n`;
-            });
-            message += `*TOTAL DEL PEDIDO: ${formatPrice(total)}*`;
-
-            const encodedMessage = encodeURIComponent(message);
-            const whatsappUrl = `https://wa.me/${config.whatsappNumber}?text=${encodedMessage}`;
-            window.open(whatsappUrl, '_blank');
-
-            trackedOrderIds = [orderId, ...trackedOrderIds.filter(id => id !== orderId)].slice(0, 10);
-            localStorage.setItem('trackedOrders', JSON.stringify(trackedOrderIds));
-            localStorage.setItem('lastOrderId', orderId);
-            trackedOrderId = orderId;
-            trackOrderButton.style.display = 'inline-flex';
-
-            showCustomAlert('Tu pedido fue registrado y enviado por WhatsApp. ¡Gracias por tu compra!');
-            clearCart();
-            closeModal(cartModal);
+            await continueOrderFlow(orderId, address, total, cart);
 
         } catch (error) {
             console.error('Error al registrar el pedido en Supabase:', error);
@@ -753,6 +764,38 @@ document.addEventListener('DOMContentLoaded', () => {
             checkoutBtn.disabled = cart.length === 0;
             checkoutBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Pedido';
         }
+    }
+
+    async function continueOrderFlow(orderId, address, total, orderItems) {
+        const shortId = orderId.slice(0, 8).toUpperCase();
+        let message = `¡Hola! 👋 Quiero confirmar mi pedido *#${shortId}*:\n\n`;
+        message += `*DIRECCIÓN DE ENTREGA:*\n${address}\n\n`;
+        message += `*PEDIDO:*\n`;
+        orderItems.forEach(item => {
+            message += `*${item.quantity}x - ${item.name}* (${formatPrice(item.finalPricePerUnit)})\n`;
+            if (item.selectedCustomizations.length > 0) {
+                message += `  - Extras: ${item.selectedCustomizations.map(c => c.name).join(', ')}\n`;
+            }
+            if (item.instructions) {
+                message += `  - Instrucciones: ${item.instructions}\n`;
+            }
+            message += `\n`;
+        });
+        message += `*TOTAL DEL PEDIDO: ${formatPrice(total)}*`;
+
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${config.whatsappNumber}?text=${encodedMessage}`;
+        window.open(whatsappUrl, '_blank');
+
+        trackedOrderIds = [orderId, ...trackedOrderIds.filter(id => id !== orderId)].slice(0, 10);
+        localStorage.setItem('trackedOrders', JSON.stringify(trackedOrderIds));
+        localStorage.setItem('lastOrderId', orderId);
+        trackedOrderId = orderId;
+        trackOrderButton.style.display = 'inline-flex';
+
+        showCustomAlert('Tu pedido fue registrado y enviado por WhatsApp. ¡Gracias por tu compra!');
+        clearCart();
+        closeModal(cartModal);
     }
 
     // --- SEGUIMIENTO DE PEDIDOS EN TIEMPO REAL ---
@@ -862,7 +905,8 @@ document.addEventListener('DOMContentLoaded', () => {
         orderStatusTimeline.style.display = 'flex';
         orderStatusCancelledMsg.style.display = 'none';
 
-        const currentIndex = ORDER_STATUS_STEPS.indexOf(status);
+        const mappedStatus = TRACK_STATUS_MAP[status] || status;
+        const currentIndex = ORDER_STATUS_STEPS.indexOf(mappedStatus);
         orderStatusTimeline.querySelectorAll('.order-status-step').forEach(stepEl => {
             const stepIndex = ORDER_STATUS_STEPS.indexOf(stepEl.dataset.status);
             stepEl.classList.toggle('completed', stepIndex <= currentIndex);
@@ -872,7 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateConfirmReceiptButton() {
         const status = orderStatuses[selectedOrderId];
-        if (selectedOrderId && status === 'despachado') {
+        if (selectedOrderId && status && (TRACK_STATUS_MAP[status] === 'despachado' || status === 'despachado')) {
             confirmReceiptBtn.style.display = 'inline-flex';
             confirmReceiptBtn.disabled = false;
         } else {
@@ -1068,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         checkoutBtn.addEventListener('click', sendOrderViaWhatsApp);
+        useGpsBtn.addEventListener('click', captureGpsLocation);
 
         shareAppBtn.addEventListener('click', () => {
             const message = '¡Vengan a probar la comida más rica de DeliciasExpress! 🍔🍕🔥 Hamburguesas, pizza, ensaladas y mucho más, todo delicioso y a un clic de distancia. ¡Los esperamos! 😋\n\n' + window.location.href;

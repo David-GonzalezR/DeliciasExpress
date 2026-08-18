@@ -39,6 +39,7 @@
                 <button class="sidebar-btn active" data-view="pedidos"><i class="fas fa-receipt"></i> Pedidos</button>
                 <button class="sidebar-btn" data-view="productos"><i class="fas fa-utensils"></i> Productos</button>
                 <button class="sidebar-btn" data-view="ofertas"><i class="fas fa-bolt"></i> Ofertas</button>
+                <button class="sidebar-btn" data-view="domiciliarios"><i class="fas fa-motorcycle"></i> Domiciliarios</button>
             </aside>
 
             <div class="admin-content">
@@ -48,6 +49,8 @@
                         <button class="status-filter-btn" data-status="recibido">Recibidos</button>
                         <button class="status-filter-btn" data-status="preparando">Preparando</button>
                         <button class="status-filter-btn" data-status="despachado">Despachados</button>
+                        <button class="status-filter-btn" data-status="buscando_domiciliario">Buscando domiciliario</button>
+                        <button class="status-filter-btn" data-status="en_camino">En camino</button>
                         <button class="status-filter-btn" data-status="entregado">Entregados</button>
                         <button class="status-filter-btn" data-status="cancelado">Cancelados</button>
                         <button class="status-filter-btn" data-status="todos">Todos</button>
@@ -75,6 +78,22 @@
                     </div>
                     <main id="offers-container" class="products-container">
                         <p id="offers-empty-message" class="orders-empty-message">Cargando ofertas...</p>
+                    </main>
+                </section>
+
+                <section id="domiciliarios-view" class="productos-view" style="display:none;">
+                    <div class="productos-header">
+                        <h2>Domiciliarios</h2>
+                    </div>
+                    <div class="riders-promote-row">
+                        <label class="form-field" style="flex:1;">
+                            Buscar usuario por correo para convertir en domiciliario
+                            <input id="rider-search-email" type="email" placeholder="correo@ejemplo.com">
+                        </label>
+                        <button id="rider-promote-btn" class="btn btn-primary"><i class="fas fa-user-plus"></i> Convertir en domiciliario</button>
+                    </div>
+                    <main id="riders-container" class="products-container">
+                        <p id="riders-empty-message" class="orders-empty-message">Cargando domiciliarios...</p>
                     </main>
                 </section>
             </div>

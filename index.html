@@ -130,6 +130,12 @@
              <div class="cart-delivery-section">
                 <h4 class="delivery-address-title">Dirección de Entrega:</h4>
                 <textarea id="delivery-address" class="special-instructions-textarea" rows="3" placeholder="Escribe tu dirección completa, incluyendo barrio, apartamento, etc..."></textarea>
+                <button type="button" id="use-gps-btn" class="btn btn-secondary gps-btn">
+                    <i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual
+                </button>
+                <p id="gps-status" class="gps-status"></p>
+                <label class="delivery-address-title" for="customer-phone">Teléfono de contacto (opcional):</label>
+                <input id="customer-phone" type="tel" class="phone-input" placeholder="Ej: 300 123 4567 — para que el domiciliario pueda llamarte">
             </div>
             <div class="modal-footer" style="flex-direction: column; gap: var(--espaciado-4);">
                 <div class="cart-summary">

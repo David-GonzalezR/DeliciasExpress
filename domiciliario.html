@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Domiciliarios - DeliciasExpress</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="login-screen" class="login-screen">
+        <form id="login-form" class="login-card">
+            <h1 class="login-logo">DeliciasExpress</h1>
+            <p class="login-subtitle">Panel de domiciliarios</p>
+            <label class="login-label" for="login-email">Correo</label>
+            <input id="login-email" class="login-input" type="email" autocomplete="username" required>
+            <label class="login-label" for="login-password">Contraseña</label>
+            <input id="login-password" class="login-input" type="password" autocomplete="current-password" required>
+            <button type="submit" id="login-submit-btn" class="btn btn-primary login-submit-btn">Entrar</button>
+            <p id="login-error" class="login-error"></p>
+        </form>
+    </div>
+
+    <!-- PANEL PRINCIPAL -->
+    <div id="dashboard" class="dashboard" style="display:none;">
+        <header class="admin-header">
+            <h1 class="admin-logo">DeliciasExpress <span>· Domiciliarios</span></h1>
+            <div class="admin-header-right">
+                <span id="realtime-indicator" class="realtime-indicator"><i class="fas fa-circle"></i> En vivo</span>
+                <label class="availability-toggle" title="Al desactivarlo no recibirás nuevos pedidos">
+                    <input type="checkbox" id="availability-toggle"> Disponible
+                </label>
+                <button id="logout-btn" class="btn btn-secondary admin-logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</button>
+            </div>
+        </header>
+
+        <div class="admin-layout">
+            <div class="admin-content">
+                <nav class="status-filter-bar">
+                    <button class="status-filter-btn active" id="available-tab">Pedidos disponibles</button>
+                    <button class="status-filter-btn" id="my-deliveries-tab">Mis entregas</button>
+                </nav>
+                <main id="available-orders-container" class="orders-container">
+                    <p id="available-orders-empty-message" class="orders-empty-message">Cargando pedidos disponibles...</p>
+                </main>
+                <main id="my-deliveries-container" class="orders-container" style="display:none;">
+                    <p id="my-deliveries-empty-message" class="orders-empty-message">Cargando mis entregas...</p>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="domiciliario.js" defer></script>
+</body>
+</html>

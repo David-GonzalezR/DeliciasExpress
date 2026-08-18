@@ -833,6 +833,34 @@ select {
   margin-bottom: var(--espaciado-2);
 }
 
+/* Botón GPS y teléfono de contacto en el checkout */
+.gps-btn {
+  margin-top: var(--espaciado-3);
+  width: 100%;
+  font-size: 0.9rem;
+}
+.gps-status {
+  font-size: 0.8rem;
+  color: var(--color-texto-secundario);
+  margin: var(--espaciado-2) 0 0;
+  min-height: 1.2em;
+}
+.phone-input {
+  width: 100%;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.95rem;
+  font-family: var(--fuente-principal);
+  color: var(--color-texto-principal);
+  background: var(--color-fondo-tarjeta);
+  margin-top: var(--espaciado-2);
+}
+.phone-input:focus {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 1px;
+}
+
 .cart-summary {
   display: flex;
   justify-content: space-between;
