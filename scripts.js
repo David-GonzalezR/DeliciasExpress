@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const orderStatusTotal = document.getElementById('order-status-total');
     const orderStatusTimeline = document.getElementById('order-status-timeline');
     const orderStatusCancelledMsg = document.getElementById('order-status-cancelled-msg');
+    const orderRiderInfo = document.getElementById('order-rider-info');
     const orderStatusList = document.getElementById('order-status-list');
     const confirmReceiptBtn = document.getElementById('confirm-receipt-btn');
     const forgetOrderBtn = document.getElementById('forget-order-btn');
@@ -833,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             orderStatusList.innerHTML = '<p style="color: var(--color-texto-secundario);">No hay pedidos registrados en este dispositivo.</p>';
             orderStatusTimeline.style.display = 'none';
             orderStatusCancelledMsg.style.display = 'none';
+            if (orderRiderInfo) orderRiderInfo.style.display = 'none';
             orderStatusShortId.textContent = '';
             orderStatusTotal.textContent = '';
             updateConfirmReceiptButton();
@@ -899,6 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status === 'cancelado') {
             orderStatusTimeline.style.display = 'none';
             orderStatusCancelledMsg.style.display = 'block';
+            if (orderRiderInfo) orderRiderInfo.style.display = 'none';
             updateConfirmReceiptButton();
             return;
         }
@@ -912,6 +915,34 @@ document.addEventListener('DOMContentLoaded', () => {
             stepEl.classList.toggle('completed', stepIndex <= currentIndex);
         });
         updateConfirmReceiptButton();
+        loadOrderRiderInfo(status, orderId);
+    }
+
+    async function loadOrderRiderInfo(status, orderId) {
+        if (!orderRiderInfo) return;
+        if (status === 'en_camino' || status === 'entregado') {
+            const { data: riderInfo, error } = await supabase.rpc('get_order_rider_info', { p_order_id: orderId });
+            if (!error && riderInfo && riderInfo.ok) {
+                const vehicleEmoji = { moto: '🏍️', bicicleta: '🚲', carro: '🚗', a_pie: '🚶' }[riderInfo.vehicle_type] || '🏍️';
+                const photoSrc = riderInfo.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(riderInfo.full_name || 'D')}&background=d32f2f&color=fff&size=80`;
+                orderRiderInfo.innerHTML = `
+                    <div class="rider-info-card">
+                        <img src="${photoSrc}" alt="${riderInfo.full_name}" class="rider-info-photo">
+                        <div class="rider-info-details">
+                            <strong>${riderInfo.full_name || 'Domiciliario'}</strong>
+                            <span>${vehicleEmoji} ${riderInfo.vehicle_type || 'Moto'}</span>
+                            <span>⭐ ${(riderInfo.rating || 5).toFixed(1)} · ${riderInfo.total_deliveries || 0} entregas</span>
+                            ${riderInfo.phone ? `<a href="tel:${riderInfo.phone}" class="btn btn-secondary btn-sm"><i class="fas fa-phone"></i> Llamar</a>` : ''}
+                        </div>
+                    </div>
+                `;
+                orderRiderInfo.style.display = 'block';
+            } else {
+                orderRiderInfo.style.display = 'none';
+            }
+        } else {
+            orderRiderInfo.style.display = 'none';
+        }
     }
 
     function updateConfirmReceiptButton() {

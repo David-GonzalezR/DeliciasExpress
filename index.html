@@ -172,6 +172,9 @@
                     <div class="order-status-step" data-status="despachado"><i class="fas fa-motorcycle"></i><span>Despachado</span></div>
                     <div class="order-status-step" data-status="entregado"><i class="fas fa-home"></i><span>Entregado</span></div>
                 </div>
+                <div id="order-rider-info" style="display:none;" class="order-rider-section">
+                    <!-- Se rellena dinámicamente por JS cuando el pedido está "en camino" -->
+                </div>
                 <p id="order-status-cancelled-msg" style="display:none; color: var(--color-primario); font-weight: 600; margin-top: var(--espaciado-4);">Este pedido fue cancelado.</p>
                 <button id="confirm-receipt-btn" class="btn btn-primary" style="display:none; width: 100%;">Confirmar que recibí mi pedido</button>
             </div>

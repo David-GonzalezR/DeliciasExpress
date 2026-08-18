@@ -42,12 +42,34 @@
                 <nav class="status-filter-bar">
                     <button class="status-filter-btn active" id="available-tab">Pedidos disponibles</button>
                     <button class="status-filter-btn" id="my-deliveries-tab">Mis entregas</button>
+                    <button class="status-filter-btn" id="my-profile-tab">Mi perfil</button>
                 </nav>
                 <main id="available-orders-container" class="orders-container">
                     <p id="available-orders-empty-message" class="orders-empty-message">Cargando pedidos disponibles...</p>
                 </main>
                 <main id="my-deliveries-container" class="orders-container" style="display:none;">
                     <p id="my-deliveries-empty-message" class="orders-empty-message">Cargando mis entregas...</p>
+                </main>
+                <main id="my-profile-container" class="orders-container" style="display:none;">
+                    <div class="rider-profile-card">
+                        <div class="rider-photo-section">
+                            <img id="rider-profile-photo" src="" alt="Foto de perfil" class="rider-profile-photo-img">
+                            <button id="change-photo-btn" class="btn btn-secondary">
+                                <i class="fas fa-camera"></i> Cambiar foto
+                            </button>
+                            <input id="rider-photo-file" type="file" accept="image/*" style="display:none;">
+                        </div>
+                        <div class="rider-stats">
+                            <div class="stat-item">
+                                <span class="stat-value" id="rider-rating">5.0</span>
+                                <span class="stat-label">⭐ Rating</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="rider-deliveries">0</span>
+                                <span class="stat-label">📦 Entregas</span>
+                            </div>
+                        </div>
+                    </div>
                 </main>
             </div>
         </div>

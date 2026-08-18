@@ -29,10 +29,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const availabilityToggle = document.getElementById('availability-toggle');
     const availableTab = document.getElementById('available-tab');
     const myDeliveriesTab = document.getElementById('my-deliveries-tab');
+    const myProfileTab = document.getElementById('my-profile-tab');
     const availableOrdersContainer = document.getElementById('available-orders-container');
     const availableOrdersEmptyMessage = document.getElementById('available-orders-empty-message');
     const myDeliveriesContainer = document.getElementById('my-deliveries-container');
     const myDeliveriesEmptyMessage = document.getElementById('my-deliveries-empty-message');
+    const myProfileContainer = document.getElementById('my-profile-container');
+    const riderProfilePhoto = document.getElementById('rider-profile-photo');
+    const changePhotoBtn = document.getElementById('change-photo-btn');
+    const riderPhotoFile = document.getElementById('rider-photo-file');
+    const riderRatingEl = document.getElementById('rider-rating');
+    const riderDeliveriesEl = document.getElementById('rider-deliveries');
 
     let currentUserId = null;
     let availableOrders = [];
@@ -124,22 +131,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DISPONIBILIDAD ---
     async function loadAvailability() {
-        const { data: profile, error } = await supabase
-            .from('profiles')
+        const { data: rider, error } = await supabase
+            .from('riders')
             .select('is_available')
             .eq('id', currentUserId)
-            .single();
-        if (!error && profile) {
-            availabilityToggle.checked = !!profile.is_available;
+            .maybeSingle();
+        if (!error && rider) {
+            availabilityToggle.checked = !!rider.is_available;
         }
     }
 
     availabilityToggle.addEventListener('change', async (e) => {
         if (!currentUserId) return;
         const { error } = await supabase
-            .from('profiles')
-            .update({ is_available: e.target.checked })
-            .eq('id', currentUserId);
+            .from('riders')
+            .upsert({ id: currentUserId, is_available: e.target.checked }, { onConflict: 'id' });
         if (error) {
             console.error('Error actualizando disponibilidad:', error);
             alert('No se pudo actualizar tu disponibilidad.');
@@ -308,14 +314,70 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTab = tab;
         availableTab.classList.toggle('active', tab === 'disponibles');
         myDeliveriesTab.classList.toggle('active', tab === 'mis-entregas');
+        myProfileTab.classList.toggle('active', tab === 'mi-perfil');
         availableOrdersContainer.style.display = tab === 'disponibles' ? 'block' : 'none';
         myDeliveriesContainer.style.display = tab === 'mis-entregas' ? 'block' : 'none';
+        myProfileContainer.style.display = tab === 'mi-perfil' ? 'block' : 'none';
         if (tab === 'disponibles') renderAvailableOrders();
         if (tab === 'mis-entregas') renderMyDeliveries();
+        if (tab === 'mi-perfil') loadMyProfile();
     }
 
     availableTab.addEventListener('click', () => setTab('disponibles'));
     myDeliveriesTab.addEventListener('click', () => setTab('mis-entregas'));
+    myProfileTab.addEventListener('click', () => setTab('mi-perfil'));
+
+    // --- MI PERFIL ---
+    async function loadMyProfile() {
+        const { data, error } = await supabase
+            .from('riders')
+            .select('photo_url, rating, total_deliveries, vehicle_type, vehicle_plate')
+            .eq('id', currentUserId)
+            .maybeSingle();
+
+        if (!error && data) {
+            if (riderRatingEl) riderRatingEl.textContent = (data.rating || 5).toFixed(1);
+            if (riderDeliveriesEl) riderDeliveriesEl.textContent = data.total_deliveries || 0;
+            if (riderProfilePhoto) {
+                riderProfilePhoto.src = data.photo_url || 'https://ui-avatars.com/api/?name=Rider&background=d32f2f&color=fff&size=128';
+            }
+        }
+    }
+
+    async function uploadRiderPhoto(file) {
+        const ext = file.name.split('.').pop();
+        const path = `${currentUserId}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+            .from('rider-photos')
+            .upload(path, file, { upsert: true, contentType: file.type });
+
+        if (uploadError) {
+            console.error('Error subiendo foto:', uploadError);
+            alert('No se pudo subir la foto. Intenta de nuevo.');
+            return;
+        }
+
+        const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path);
+        const photoUrl = urlData.publicUrl;
+
+        const { error: dbError } = await supabase
+            .from('riders')
+            .upsert({ id: currentUserId, photo_url: photoUrl }, { onConflict: 'id' });
+
+        if (dbError) {
+            console.error('Error guardando photo_url:', dbError);
+            alert('La foto se subió pero no se pudo guardar la referencia.');
+            return;
+        }
+
+        if (riderProfilePhoto) riderProfilePhoto.src = photoUrl;
+    }
+
+    changePhotoBtn.addEventListener('click', () => riderPhotoFile.click());
+    riderPhotoFile.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) uploadRiderPhoto(file);
+    });
 
     // --- RENDER ---
     function renderAvailableOrders() {

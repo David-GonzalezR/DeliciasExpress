@@ -92,6 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const riderPhoneInput = document.getElementById('rider-phone');
     const riderEmailInput = document.getElementById('rider-email');
     const riderPasswordInput = document.getElementById('rider-password');
+    const riderVehicleTypeInput = document.getElementById('rider-vehicle-type');
+    const riderVehiclePlateInput = document.getElementById('rider-vehicle-plate');
+    const riderIdNumberInput = document.getElementById('rider-id-number');
     const toggleRiderPasswordBtn = document.getElementById('toggle-rider-password');
     const riderFormError = document.getElementById('rider-form-error');
     const saveRiderBtn = document.getElementById('save-rider-btn');
@@ -510,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, full_name, phone, email, is_available, role')
+            .select('id, full_name, phone, email, role, riders ( photo_url, vehicle_type, vehicle_plate, is_available, rating, total_deliveries )')
             .eq('role', 'domiciliario');
 
         if (error) {
@@ -533,16 +536,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'product-card rider-card';
 
-        const availabilityBadge = rider.is_available
+        const riderData = rider.riders || {};
+        const availabilityBadge = riderData.is_available
             ? '<span class="product-badge product-badge-offer">Disponible</span>'
             : '<span class="product-badge product-badge-new">No disponible</span>';
 
+        const vehicleIcon = { moto: '🏍️', bicicleta: '🚲', carro: '🚗', a_pie: '🚶' }[riderData.vehicle_type] || '🏍️';
+        const vehicleText = riderData.vehicle_type
+            ? `${vehicleIcon} ${riderData.vehicle_type.replace('_', ' ')}${riderData.vehicle_plate ? ` · ${riderData.vehicle_plate}` : ''}`
+            : null;
+        const ratingText = riderData.rating != null
+            ? `⭐ ${Number(riderData.rating).toFixed(1)} · ${riderData.total_deliveries || 0} entregas`
+            : null;
+        const photoHtml = riderData.photo_url
+            ? `<img src="${riderData.photo_url}" class="rider-photo-thumb" alt="${rider.full_name}">`
+            : `<div class="rider-photo-thumb rider-photo-placeholder"><i class="fas fa-user"></i></div>`;
+
         card.innerHTML = `
             <div class="product-card-body">
-                <h4 class="product-card-name"><i class="fas fa-motorcycle"></i> ${rider.full_name || 'Sin nombre'}</h4>
+                <div class="rider-card-header">
+                    ${photoHtml}
+                    <h4 class="product-card-name"><i class="fas fa-motorcycle"></i> ${rider.full_name || 'Sin nombre'}</h4>
+                </div>
                 <div class="product-badges">${availabilityBadge}</div>
                 <span class="product-card-stock">${rider.phone ? `<i class="fas fa-phone"></i> ${rider.phone}` : 'Sin teléfono registrado'}</span>
                 <span class="product-card-stock">${rider.email ? `<i class="fas fa-envelope"></i> ${rider.email}` : 'Sin correo registrado'}</span>
+                ${vehicleText ? `<span class="product-card-stock">${vehicleText}</span>` : ''}
+                ${ratingText ? `<span class="product-card-stock">${ratingText}</span>` : ''}
                 <div class="product-actions">
                     <button class="btn btn-delete" data-action="demote-rider" data-id="${rider.id}"><i class="fas fa-user-minus"></i> Quitar rol de domiciliario</button>
                 </div>
@@ -580,6 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .from('profiles')
             .update({ role: 'domiciliario' })
             .eq('id', profile.id);
+
+        if (!updateError) {
+            await supabase
+                .from('riders')
+                .upsert({ id: profile.id, is_available: false }, { onConflict: 'id' });
+        }
 
         riderPromoteBtn.disabled = false;
         if (updateError) {
@@ -670,6 +696,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 email: email,
                 is_available: false
             }, { onConflict: 'id' });
+
+        // 3. Crear la fila operativa en riders
+        const { error: riderError } = await supabase
+            .from('riders')
+            .upsert({
+                id: userId,
+                vehicle_type: riderVehicleTypeInput.value || 'moto',
+                vehicle_plate: riderVehiclePlateInput.value.trim() || null,
+                id_number: riderIdNumberInput.value.trim() || null,
+                is_available: false
+            }, { onConflict: 'id' });
+
+        if (riderError) {
+            console.error('Error creando fila riders:', riderError);
+        }
 
         saveRiderBtn.disabled = false;
         saveRiderBtn.innerHTML = '<i class="fas fa-user-plus"></i> Crear cuenta';
