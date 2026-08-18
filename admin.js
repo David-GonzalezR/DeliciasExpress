@@ -685,17 +685,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 2. Actualizar (o insertar) el perfil con rol domiciliario
+        // 2. Actualizar el perfil con rol domiciliario (el trigger ya lo insertó)
         const { error: profileError } = await supabase
             .from('profiles')
-            .upsert({
-                id: userId,
+            .update({
                 role: 'domiciliario',
                 full_name: name,
                 phone: phone || null,
-                email: email,
-                is_available: false
-            }, { onConflict: 'id' });
+                email: email
+                // is_available ya no se necesita aquí porque va en riders
+            })
+            .eq('id', userId);
 
         // 3. Crear la fila operativa en riders
         const { error: riderError } = await supabase
