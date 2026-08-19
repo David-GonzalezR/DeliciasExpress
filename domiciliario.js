@@ -486,6 +486,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error || !(data && data.ok)) {
             if (data && data.error === 'ya_tomado') {
                 alert('Este pedido ya fue tomado por otro domiciliario.');
+            } else if (data && data.error) {
+                alert('No se pudo aceptar el pedido: ' + data.error);
+            } else if (error) {
+                alert('Error de base de datos: ' + error.message);
             } else {
                 alert('No se pudo aceptar el pedido. Intenta de nuevo.');
             }

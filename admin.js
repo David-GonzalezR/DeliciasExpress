@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         let actionsHtml = '';
-        if (STATUS_FLOW.includes(order.status)) {
+        if (STATUS_FLOW.includes(order.status) && NEXT_ACTION_LABEL[order.status]) {
             actionsHtml += `<button class="btn btn-status-advance" data-action="advance" data-id="${order.id}" data-current="${order.status}">${NEXT_ACTION_LABEL[order.status]}</button>`;
         }
         if (order.status === 'despachado') {
