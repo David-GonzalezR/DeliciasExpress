@@ -384,8 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(currentStatus) + 1];
             await updateOrderStatus(orderId, nextStatus);
         } else if (btn.dataset.action === 'request-delivery') {
-            const { data, error } = await supabase.rpc('request_delivery', { p_order_id: orderId });
-            if (error || !(data && data.ok)) {
+            const { error } = await supabase.from('orders').update({ status: 'buscando_domiciliario', delivery_requested_at: new Date().toISOString() }).eq('id', orderId);
+            if (error) {
+                console.error('Error request-delivery:', error);
                 alert('No se pudo solicitar el domiciliario. Intenta de nuevo.');
                 btn.disabled = false;
                 return;
@@ -397,8 +398,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.disabled = false;
                 return;
             }
-            const { data, error } = await supabase.rpc('cancel_delivery_request', { p_order_id: orderId });
-            if (error || !(data && data.ok)) {
+            const { error } = await supabase.from('orders').update({ status: 'despachado', delivery_requested_at: null }).eq('id', orderId);
+            if (error) {
+                console.error('Error cancel-delivery-request:', error);
                 alert('No se pudo cancelar la solicitud. Intenta de nuevo.');
                 btn.disabled = false;
                 return;
