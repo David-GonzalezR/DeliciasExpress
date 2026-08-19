@@ -498,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
             removeOrderFromAvailable(orderId);
             insertOrderIntoMyDeliveries({ ...order, status: 'en_camino', assigned_rider_id: currentUserId });
             setTab('mis-entregas');
+            loadAvailability();
         }
     });
 
@@ -516,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         removeOrderFromMyDeliveries(orderId);
+        loadAvailability();
     });
 
     // --- UTIL ---

@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
 
     // --- STATUS FLOW ---
-    const STATUS_FLOW = ['recibido', 'preparando'];
+    const STATUS_FLOW = ['recibido', 'preparando', 'despachado'];
     const STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
