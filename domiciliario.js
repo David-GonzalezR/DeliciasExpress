@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const myDeliveriesEmptyMessage = document.getElementById('my-deliveries-empty-message');
     const myProfileContainer = document.getElementById('my-profile-container');
     const riderProfilePhoto = document.getElementById('rider-profile-photo');
+    const riderProfileName = document.getElementById('rider-profile-name');
     const changePhotoBtn = document.getElementById('change-photo-btn');
     const riderPhotoFile = document.getElementById('rider-photo-file');
     const riderRatingEl = document.getElementById('rider-rating');
@@ -330,47 +331,93 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MI PERFIL ---
     async function loadMyProfile() {
         const { data, error } = await supabase
-            .from('riders')
-            .select('photo_url, rating, total_deliveries, vehicle_type, vehicle_plate')
+            .from('profiles')
+            .select('full_name, riders ( photo_url, rating, total_deliveries, vehicle_type, vehicle_plate )')
             .eq('id', currentUserId)
             .maybeSingle();
 
         if (!error && data) {
-            if (riderRatingEl) riderRatingEl.textContent = (data.rating || 5).toFixed(1);
-            if (riderDeliveriesEl) riderDeliveriesEl.textContent = data.total_deliveries || 0;
+            const rData = data.riders || {};
+            if (riderProfileName) riderProfileName.textContent = data.full_name || 'Domiciliario';
+            if (riderRatingEl) riderRatingEl.textContent = (rData.rating || 5).toFixed(1);
+            if (riderDeliveriesEl) riderDeliveriesEl.textContent = rData.total_deliveries || 0;
             if (riderProfilePhoto) {
-                riderProfilePhoto.src = data.photo_url || 'https://ui-avatars.com/api/?name=Rider&background=d32f2f&color=fff&size=128';
+                const nameFallback = encodeURIComponent(data.full_name || 'Rider');
+                const photoUrl = rData.photo_url;
+                riderProfilePhoto.src = photoUrl ? `${photoUrl}?t=${new Date().getTime()}` : `https://ui-avatars.com/api/?name=${nameFallback}&background=d32f2f&color=fff&size=128`;
             }
         }
     }
 
     async function uploadRiderPhoto(file) {
-        const ext = file.name.split('.').pop();
-        const path = `${currentUserId}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-            .from('rider-photos')
-            .upload(path, file, { upsert: true, contentType: file.type });
+        changePhotoBtn.disabled = true;
+        changePhotoBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
 
-        if (uploadError) {
-            console.error('Error subiendo foto:', uploadError);
-            alert('No se pudo subir la foto. Intenta de nuevo.');
-            return;
+        try {
+            // Optimización y recorte automático a un cuadrado de 400x400
+            const processedFile = await processAndCropImage(file, 400);
+            
+            const ext = 'jpg';
+            const path = `${currentUserId}.${ext}`;
+            const { error: uploadError } = await supabase.storage
+                .from('rider-photos')
+                .upload(path, processedFile, { upsert: true, contentType: 'image/jpeg' });
+
+            if (uploadError) {
+                console.error('Error subiendo foto:', uploadError);
+                alert('No se pudo subir la foto. Intenta de nuevo.');
+                return;
+            }
+
+            const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path);
+            const photoUrl = urlData.publicUrl;
+
+            const { error: dbError } = await supabase
+                .from('riders')
+                .upsert({ id: currentUserId, photo_url: photoUrl }, { onConflict: 'id' });
+
+            if (dbError) {
+                console.error('Error guardando photo_url:', dbError);
+                alert('La foto se subió pero no se pudo guardar la referencia.');
+                return;
+            }
+
+            if (riderProfilePhoto) riderProfilePhoto.src = `${photoUrl}?t=${new Date().getTime()}`;
+        } finally {
+            changePhotoBtn.disabled = false;
+            changePhotoBtn.innerHTML = '<i class="fas fa-camera"></i> Cambiar foto';
         }
+    }
 
-        const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path);
-        const photoUrl = urlData.publicUrl;
-
-        const { error: dbError } = await supabase
-            .from('riders')
-            .upsert({ id: currentUserId, photo_url: photoUrl }, { onConflict: 'id' });
-
-        if (dbError) {
-            console.error('Error guardando photo_url:', dbError);
-            alert('La foto se subió pero no se pudo guardar la referencia.');
-            return;
-        }
-
-        if (riderProfilePhoto) riderProfilePhoto.src = photoUrl;
+    function processAndCropImage(file, size) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Calcular el recorte centrado
+                    const minSize = Math.min(img.width, img.height);
+                    const startX = (img.width - minSize) / 2;
+                    const startY = (img.height - minSize) / 2;
+                    
+                    // Dibujar imagen recortada (fondo blanco en caso de PNG transparente)
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, size, size);
+                    ctx.drawImage(img, startX, startY, minSize, minSize, 0, 0, size, size);
+                    
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/jpeg', 0.85); // 85% de calidad JPG
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     changePhotoBtn.addEventListener('click', () => riderPhotoFile.click());

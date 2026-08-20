@@ -8,19 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
 
     // --- STATUS FLOW ---
-    const STATUS_FLOW = ['recibido', 'preparando', 'despachado'];
+    // Flujo: recibido → preparando → (buscar domiciliario) → buscando_domiciliario → en_camino → entregado
+    // 'despachado' ya NO es un paso visible para el admin; se salta directamente a buscar domiciliario.
+    const STATUS_FLOW = ['recibido', 'preparando'];
     const STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
-        despachado: 'Despachado',
+        despachado: 'Listo para envío',   // estado interno legacy, no debe aparecer normalmente
         buscando_domiciliario: 'Buscando domiciliario',
         en_camino: 'En camino',
         entregado: 'Entregado',
         cancelado: 'Cancelado'
     };
     const NEXT_ACTION_LABEL = {
-        recibido: 'Marcar Preparando',
-        preparando: 'Marcar Despachado'
+        recibido: 'Marcar Preparando'
+        // 'preparando' no avanza con botón de texto; usa el botón "Buscar Domiciliario"
     };
 
     // --- DOM ---
@@ -279,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getFilteredOrders() {
         if (currentFilter === 'todos') return allOrders;
-        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'despachado', 'buscando_domiciliario', 'en_camino'].includes(o.status));
+        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'despachado', 'buscando_domiciliario', 'en_camino'].includes(o.status)); // 'despachado' se mantiene para compatibilidad legacy
         return allOrders.filter(o => o.status === currentFilter);
     }
 
@@ -322,9 +324,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (STATUS_FLOW.includes(order.status) && NEXT_ACTION_LABEL[order.status]) {
             actionsHtml += `<button class="btn btn-status-advance" data-action="advance" data-id="${order.id}" data-current="${order.status}">${NEXT_ACTION_LABEL[order.status]}</button>`;
         }
+        // El botón "Buscar Domiciliario" aparece cuando el pedido está listo (preparando)
+        // ya NO pasa por 'despachado' primero — eso evitaba que el cliente vea "Despachado" sin domiciliario.
+        if (order.status === 'preparando') {
+            actionsHtml += `<button class="btn btn-status-advance" data-action="request-delivery" data-id="${order.id}">
+                <i class="fas fa-motorcycle"></i> Buscar Domiciliario
+            </button>`;
+        }
+        // Compatibilidad: si algún pedido quedó en 'despachado' (estado legacy), mostrar el botón también
         if (order.status === 'despachado') {
             actionsHtml += `<button class="btn btn-status-advance" data-action="request-delivery" data-id="${order.id}">
-                <i class="fas fa-motorcycle"></i> Pedir Domicilio
+                <i class="fas fa-motorcycle"></i> Buscar Domiciliario
             </button>`;
         }
         if (order.status === 'buscando_domiciliario' && !order.assigned_rider_id) {
@@ -394,11 +404,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const idx = allOrders.findIndex(o => o.id === orderId);
             if (idx !== -1) { allOrders[idx].status = 'buscando_domiciliario'; renderOrders(); }
         } else if (btn.dataset.action === 'cancel-delivery-request') {
-            if (!confirm('¿Cancelar la solicitud de domicilio? El pedido volverá a "Despachado".')) {
+            if (!confirm('¿Cancelar la solicitud de domicilio? El pedido volverá a "Preparando".')) {
                 btn.disabled = false;
                 return;
             }
-            const { error } = await supabase.from('orders').update({ status: 'despachado', delivery_requested_at: null }).eq('id', orderId);
+            // Vuelve a 'preparando' (no a 'despachado') para que el cliente no vea un estado incorrecto
+            const { error } = await supabase.from('orders').update({ status: 'preparando', delivery_requested_at: null }).eq('id', orderId);
             if (error) {
                 console.error('Error cancel-delivery-request:', error);
                 alert('No se pudo cancelar la solicitud. Intenta de nuevo.');
@@ -406,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const idx = allOrders.findIndex(o => o.id === orderId);
-            if (idx !== -1) { allOrders[idx].status = 'despachado'; allOrders[idx].delivery_requested_at = null; renderOrders(); }
+            if (idx !== -1) { allOrders[idx].status = 'preparando'; allOrders[idx].delivery_requested_at = null; renderOrders(); }
         } else if (btn.dataset.action === 'cancel') {
             if (confirm('¿Cancelar este pedido?')) {
                 await updateOrderStatus(orderId, 'cancelado');
@@ -687,17 +698,48 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 2. Actualizar el perfil con rol domiciliario (el trigger ya lo insertó)
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .update({
-                role: 'domiciliario',
-                full_name: name,
-                phone: phone || null,
-                email: email
-                // is_available ya no se necesita aquí porque va en riders
-            })
-            .eq('id', userId);
+        // 2. Actualizar el perfil con rol domiciliario.
+        //    El trigger de auth que crea el perfil puede tardar varios cientos de ms.
+        //    Estrategia: esperar a que el perfil aparezca (SELECT), luego actualizarlo.
+        let profileError = null;
+        let profileFound = false;
+
+        // Esperar hasta 5 segundos a que el trigger cree el perfil
+        for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const { data: existing } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', userId)
+                .maybeSingle();
+            if (existing) { profileFound = true; break; }
+        }
+
+        if (profileFound) {
+            // El perfil ya existe, actualizarlo
+            const { error: updErr } = await supabase
+                .from('profiles')
+                .update({
+                    role: 'domiciliario',
+                    full_name: name,
+                    phone: phone || null,
+                    email: email
+                })
+                .eq('id', userId);
+            profileError = updErr || null;
+        } else {
+            // El trigger nunca creó el perfil — crearlo manualmente con upsert
+            const { error: upsErr } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: userId,
+                    role: 'domiciliario',
+                    full_name: name,
+                    phone: phone || null,
+                    email: email
+                }, { onConflict: 'id' });
+            profileError = upsErr || null;
+        }
 
         // 3. Crear la fila operativa en riders
         const { error: riderError } = await supabase

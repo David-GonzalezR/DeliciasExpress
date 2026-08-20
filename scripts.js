@@ -114,12 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let capturedLat = null;
     let capturedLng = null;
 
-    const ORDER_STATUS_STEPS = ['recibido', 'preparando', 'despachado', 'entregado'];
-    const TRACK_STATUS_MAP = { buscando_domiciliario: 'despachado', en_camino: 'despachado' };
+    // Pasos visibles del tracker para el cliente:
+    // Recibido → Preparando → En camino → Entregado
+    // 'despachado' es estado interno del admin; el cliente nunca lo ve.
+    const ORDER_STATUS_STEPS = ['recibido', 'preparando', 'en_camino', 'entregado'];
+    // Mapea estados internos al paso que activan en el tracker del cliente
+    const TRACK_STATUS_MAP = {
+        despachado: 'preparando',          // si algún pedido legacy está en despachado, se muestra como preparando
+        buscando_domiciliario: 'en_camino' // ya se está buscando → activa el paso "en camino"
+    };
     const ORDER_STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
-        despachado: 'Despachado',
+        despachado: 'Preparando',    // legacy: tratar como preparando al cliente
+        buscando_domiciliario: 'Buscando domiciliario',
+        en_camino: 'En camino',
         entregado: 'Entregado',
         cancelado: 'Cancelado'
     };
@@ -931,6 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="rider-info-details">
                             <strong>${riderInfo.full_name || 'Domiciliario'}</strong>
                             <span>${vehicleEmoji} ${riderInfo.vehicle_type || 'Moto'}</span>
+                            ${riderInfo.id_number ? `<span><i class="fas fa-id-card"></i> C.C. ${riderInfo.id_number}</span>` : ''}
                             <span>⭐ ${(riderInfo.rating || 5).toFixed(1)} · ${riderInfo.total_deliveries || 0} entregas</span>
                             ${riderInfo.phone ? `<a href="tel:${riderInfo.phone}" class="btn btn-secondary btn-sm"><i class="fas fa-phone"></i> Llamar</a>` : ''}
                         </div>
@@ -947,7 +957,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateConfirmReceiptButton() {
         const status = orderStatuses[selectedOrderId];
-        if (selectedOrderId && status && (TRACK_STATUS_MAP[status] === 'despachado' || status === 'despachado')) {
+        // El botón de confirmar entrega solo aparece cuando el pedido está "en_camino" o "entregado"
+        const isOnTheWay = status === 'en_camino' || status === 'entregado' || TRACK_STATUS_MAP[status] === 'en_camino';
+        if (selectedOrderId && status && isOnTheWay) {
             confirmReceiptBtn.style.display = 'inline-flex';
             confirmReceiptBtn.disabled = false;
         } else {
@@ -966,7 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (data === false) {
-            showCustomAlert('Este pedido aún no está en camino. Espera a que sea despachado.');
+            showCustomAlert('Este pedido aún no está en camino. Espera a que el domiciliario lo tome.');
             refreshTrackedOrders();
             return;
         }

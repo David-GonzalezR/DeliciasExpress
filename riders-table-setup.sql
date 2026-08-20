@@ -121,7 +121,8 @@ BEGIN
     'photo_url',     r.photo_url,
     'vehicle_type',  r.vehicle_type,
     'rating',        r.rating,
-    'total_deliveries', r.total_deliveries
+    'total_deliveries', r.total_deliveries,
+    'id_number',     r.id_number
   ) INTO v_result
   FROM public.profiles p
   LEFT JOIN public.riders r ON r.id = p.id
