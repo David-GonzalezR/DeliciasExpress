@@ -146,7 +146,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUserId) return;
         const { error } = await supabase
             .from('riders')
-            .upsert({ id: currentUserId, is_available: e.target.checked }, { onConflict: 'id' });
+            .update({ is_available: e.target.checked })
+            .eq('id', currentUserId);
         if (error) {
             console.error('Error actualizando disponibilidad:', error);
             alert('No se pudo actualizar tu disponibilidad.');
@@ -374,11 +375,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const { error: dbError } = await supabase
                 .from('riders')
-                .upsert({ id: currentUserId, photo_url: photoUrl }, { onConflict: 'id' });
+                .update({ photo_url: photoUrl })
+                .eq('id', currentUserId);
 
             if (dbError) {
                 console.error('Error guardando photo_url:', dbError);
-                alert('La foto se subió pero no se pudo guardar la referencia.');
+                alert('La foto se subió pero no se pudo guardar la referencia: ' + (dbError.message || JSON.stringify(dbError)));
                 return;
             }
 
