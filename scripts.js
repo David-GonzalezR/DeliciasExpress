@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let trackedOrderId = null;
     let selectedOrderId = null;
     let orderRealtimeChannel = null;
+    let orderPollingInterval = null;
     let currentUser = null;
     let isSignupMode = false;
     let flashDiscountMap = {};
@@ -487,6 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeModal(modalElement) {
         modalElement.classList.remove('show');
+        if (modalElement === orderStatusModal) stopOrderPolling();
         if (!document.querySelector('.modal.show')) {
             document.body.style.overflow = 'auto';
         }
@@ -870,12 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
         subscribeToOrderStatus(orderId);
     }
 
-    async function subscribeToOrderStatus(orderId) {
-        if (orderRealtimeChannel) {
-            supabase.removeChannel(orderRealtimeChannel);
-            orderRealtimeChannel = null;
-        }
-
+    async function refreshSingleOrderStatus(orderId) {
         const { data, error } = await supabase.rpc('get_order_status', { order_id: orderId });
         if (!error && data && data.length > 0) {
             orderStatuses[orderId] = data[0].status;
@@ -885,6 +882,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderOrderStatus(data[0].status, orderId);
             }
         }
+    }
+
+    function stopOrderPolling() {
+        if (orderPollingInterval) {
+            clearInterval(orderPollingInterval);
+            orderPollingInterval = null;
+        }
+    }
+
+    function subscribeToOrderStatus(orderId) {
+        if (orderRealtimeChannel) {
+            supabase.removeChannel(orderRealtimeChannel);
+            orderRealtimeChannel = null;
+        }
+        stopOrderPolling();
+
+        refreshSingleOrderStatus(orderId);
 
         orderRealtimeChannel = supabase
             .channel(`order-status-${orderId}`)
@@ -901,6 +915,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             })
             .subscribe();
+
+        // Respaldo por polling: si Realtime no está habilitado en la tabla
+        // 'orders' o el cliente es anónimo (RLS bloquea el evento), esto
+        // garantiza que el cliente vea el cambio de estado igualmente.
+        orderPollingInterval = setInterval(() => refreshSingleOrderStatus(orderId), 5000);
     }
 
     function renderOrderStatus(status, orderId) {
@@ -998,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
             supabase.removeChannel(orderRealtimeChannel);
             orderRealtimeChannel = null;
         }
+        stopOrderPolling();
         trackOrderButton.style.display = 'none';
         closeModal(orderStatusModal);
     }

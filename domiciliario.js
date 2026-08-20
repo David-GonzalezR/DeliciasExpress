@@ -93,9 +93,22 @@ document.addEventListener('DOMContentLoaded', () => {
         loadAvailableOrders();
         loadMyDeliveries();
         subscribeToOrders();
-        setInterval(() => {
-            if (currentTab === 'disponibles') loadAvailableOrders();
-        }, 20000);
+        setInterval(pollForUpdates, 5000);
+    }
+
+    // Respaldo por polling: refresca los pedidos disponibles cada 5s aunque
+    // Realtime esté deshabilitado en Supabase, y avisa con sonido + resaltado
+    // de la pestaña cuando aparece un pedido nuevo.
+    async function pollForUpdates() {
+        if (!currentUserId) return;
+        const knownIds = new Set(availableOrders.map(o => o.id));
+        await loadAvailableOrders();
+        if (currentTab === 'mis-entregas') await loadMyDeliveries();
+        const fresh = availableOrders.filter(o => !knownIds.has(o.id));
+        if (fresh.length > 0) {
+            playNewOrderChime();
+            availableTab.classList.add('has-notification');
+        }
     }
 
     loginForm.addEventListener('submit', async (e) => {
@@ -157,8 +170,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CARGA DE PEDIDOS ---
     async function loadAvailableOrders() {
-        availableOrdersEmptyMessage.style.display = 'block';
-        availableOrdersEmptyMessage.textContent = 'Cargando pedidos disponibles...';
+        if (availableOrders.length === 0) {
+            availableOrdersEmptyMessage.style.display = 'block';
+            availableOrdersEmptyMessage.textContent = 'Cargando pedidos disponibles...';
+        }
 
         const { data, error } = await supabase
             .from('orders')
@@ -238,7 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (order.status === 'buscando_domiciliario' && !order.assigned_rider_id) {
             fetchOrderWithItems(order.id).then(fullOrder => {
-                if (fullOrder) insertOrderIntoAvailable(fullOrder);
+                if (fullOrder) {
+                    insertOrderIntoAvailable(fullOrder);
+                    availableTab.classList.add('has-notification');
+                }
             });
             return;
         }
@@ -317,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         availableTab.classList.toggle('active', tab === 'disponibles');
         myDeliveriesTab.classList.toggle('active', tab === 'mis-entregas');
         myProfileTab.classList.toggle('active', tab === 'mi-perfil');
+        if (tab === 'disponibles') availableTab.classList.remove('has-notification');
         availableOrdersContainer.style.display = tab === 'disponibles' ? 'block' : 'none';
         myDeliveriesContainer.style.display = tab === 'mis-entregas' ? 'block' : 'none';
         myProfileContainer.style.display = tab === 'mi-perfil' ? 'block' : 'none';
