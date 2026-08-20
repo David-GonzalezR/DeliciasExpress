@@ -957,8 +957,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateConfirmReceiptButton() {
         const status = orderStatuses[selectedOrderId];
-        // El botón de confirmar entrega solo aparece cuando el pedido está "en_camino" o "entregado"
-        const isOnTheWay = status === 'en_camino' || status === 'entregado' || TRACK_STATUS_MAP[status] === 'en_camino';
+        // El botón de confirmar entrega solo aparece cuando el pedido está REALMENTE "en_camino" o "entregado".
+        // 'buscando_domiciliario' activa el paso visual "En camino" pero el domiciliario aún no ha aceptado:
+        // no se puede confirmar la entrega todavía.
+        const isOnTheWay = status === 'en_camino' || status === 'entregado';
         if (selectedOrderId && status && isOnTheWay) {
             confirmReceiptBtn.style.display = 'inline-flex';
             confirmReceiptBtn.disabled = false;
