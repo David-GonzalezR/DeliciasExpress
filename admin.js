@@ -281,7 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getFilteredOrders() {
         if (currentFilter === 'todos') return allOrders;
-        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'despachado', 'buscando_domiciliario', 'en_camino'].includes(o.status)); // 'despachado' se mantiene para compatibilidad legacy
+        if (currentFilter === 'activos') return allOrders.filter(o => ['recibido', 'preparando', 'buscando_domiciliario', 'en_camino'].includes(o.status));
+        if (currentFilter === 'despachado') return allOrders.filter(o => ['buscando_domiciliario', 'en_camino'].includes(o.status));
         return allOrders.filter(o => o.status === currentFilter);
     }
 
