@@ -62,16 +62,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. (OPCIONAL) Migrar pedidos que quedaron en 'despachado' sin domiciliario → 'preparando'
+-- 3. Actualizar confirm_order_received para validar estado 'en_camino' (en vez de 'despachado')
+CREATE OR REPLACE FUNCTION public.confirm_order_received(p_order_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+declare v_status text;
+begin
+  select status into v_status from public.orders where id = p_order_id;
+  if v_status is null then return false; end if;
+  if v_status = 'en_camino' then
+    update public.orders set status = 'entregado', delivered_at = now() where id = p_order_id;
+    return true;
+  end if;
+  return false;
+end;
+$function$;
+
+-- 4. (OPCIONAL) Migrar pedidos que quedaron en 'despachado' sin domiciliario → 'preparando'
 --    Descomenta si quieres limpiar la base de datos de estados legacy:
 -- UPDATE public.orders
 -- SET status = 'preparando'
 -- WHERE status = 'despachado'
 --   AND assigned_rider_id IS NULL;
 
--- 4. Verificar el resultado
+-- 5. Verificar el resultado
 SELECT id, status, delivery_requested_at, assigned_rider_id
 FROM public.orders
-WHERE status IN ('preparando', 'despachado', 'buscando_domiciliario')
+WHERE status IN ('preparando', 'despachado', 'buscando_domiciliario', 'en_camino')
 ORDER BY created_at DESC
 LIMIT 20;
+
