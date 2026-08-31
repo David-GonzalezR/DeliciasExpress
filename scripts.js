@@ -114,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashTimerInterval = null;
     let capturedLat = null;
     let capturedLng = null;
+    let gpsCapturePromise = null;
+    let gpsCaptureResolve = null;
+    let gpsCaptureReject = null;
 
     // Pasos visibles del tracker para el cliente:
     // Recibido → Preparando → En camino → Entregado
@@ -489,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal(modalElement) {
         modalElement.classList.remove('show');
         if (modalElement === orderStatusModal) stopOrderPolling();
+        if (modalElement === cartModal) resetGpsCapture();
         if (!document.querySelector('.modal.show')) {
             document.body.style.overflow = 'auto';
         }
@@ -625,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clearCart() {
         cart = [];
+        resetGpsCapture();
         updateCartOnUIAndStorage();
     }
 
@@ -635,6 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openCartModal() {
+        resetGpsCapture();
         renderCartItems();
         showModal(cartModal);
     }
@@ -699,24 +705,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- GUARDAR PEDIDO EN SUPABASE Y ENVIAR POR WHATSAPP ---
+
     function captureGpsLocation() {
         if (!navigator.geolocation) {
             gpsStatus.textContent = 'Tu navegador no soporta geolocalización.';
-            return;
+            useGpsBtn.disabled = true;
+            useGpsBtn.innerHTML = '<i class="fas fa-times-circle"></i> GPS no disponible';
+            return Promise.reject(new Error('Geolocation not supported'));
         }
-        gpsStatus.textContent = 'Obteniendo ubicación...';
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                capturedLat = pos.coords.latitude;
-                capturedLng = pos.coords.longitude;
-                gpsStatus.textContent = 'Ubicación capturada. Se enviará junto con tu dirección.';
-                useGpsBtn.innerHTML = '<i class="fas fa-check-circle"></i> Ubicación capturada';
-            },
-            (err) => {
-                gpsStatus.textContent = 'No se pudo obtener tu ubicación. Puedes seguir solo con la dirección escrita.';
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+
+        if (capturedLat && capturedLng) {
+            gpsStatus.textContent = 'Ubicación ya capturada.';
+            return Promise.resolve({ lat: capturedLat, lng: capturedLng });
+        }
+
+        useGpsBtn.disabled = true;
+        useGpsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo ubicación...';
+        gpsStatus.textContent = 'Obteniendo ubicación precisa...';
+
+        gpsCapturePromise = new Promise((resolve, reject) => {
+            gpsCaptureResolve = resolve;
+            gpsCaptureReject = reject;
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    capturedLat = pos.coords.latitude;
+                    capturedLng = pos.coords.longitude;
+                    gpsStatus.textContent = '✅ Ubicación capturada con precisión ' + Math.round(pos.coords.accuracy) + 'm';
+                    useGpsBtn.innerHTML = '<i class="fas fa-check-circle"></i> Ubicación capturada';
+                    useGpsBtn.classList.add('gps-captured');
+                    resolve({ lat: capturedLat, lng: capturedLng });
+                },
+                (err) => {
+                    let msg = 'No se pudo obtener tu ubicación. ';
+                    if (err.code === err.PERMISSION_DENIED) {
+                        msg += 'Permiso denegado. Puedes escribir la dirección manualmente.';
+                    } else if (err.code === err.TIMEOUT) {
+                        msg += 'Tiempo agotado. Intenta de nuevo o escribe la dirección.';
+                    } else {
+                        msg += 'Error: ' + err.message + '. Puedes seguir solo con la dirección escrita.';
+                    }
+                    gpsStatus.textContent = msg;
+                    useGpsBtn.disabled = false;
+                    useGpsBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual';
+                    useGpsBtn.classList.remove('gps-captured');
+                    reject(err);
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        });
+
+        return gpsCapturePromise;
+    }
+
+    function resetGpsCapture() {
+        capturedLat = null;
+        capturedLng = null;
+        gpsCapturePromise = null;
+        gpsCaptureResolve = null;
+        gpsCaptureReject = null;
+        useGpsBtn.disabled = false;
+        useGpsBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual';
+        useGpsBtn.classList.remove('gps-captured');
+        gpsStatus.textContent = '';
     }
 
     async function sendOrderViaWhatsApp() {
@@ -729,6 +780,21 @@ document.addEventListener('DOMContentLoaded', () => {
             showCustomAlert('Por favor, ingresa tu dirección de entrega.');
             deliveryAddressInput.focus();
             return;
+        }
+
+        // Si hay una captura GPS en progreso, esperarla (máx 5s extra)
+        if (gpsCapturePromise) {
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Esperando GPS...';
+            try {
+                await Promise.race([
+                    gpsCapturePromise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 5000))
+                ]);
+            } catch (e) {
+                // GPS falló o tardó demasiado: continuar solo con dirección
+                console.warn('GPS no disponible al enviar, continuando con dirección:', e.message);
+            }
         }
 
         const total = cart.reduce((sum, item) => sum + item.finalPricePerUnit * item.quantity, 0);
@@ -754,16 +820,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 p_lng: capturedLng,
                 p_customer_phone: customerPhoneInput ? customerPhoneInput.value.trim() : null
             });
-
-            if (orderError && orderError.message && /argument|signature|function/i.test(orderError.message)) {
-                const { data: fallbackId, error: fallbackError } = await supabase.rpc('create_order', {
-                    p_delivery_address: address,
-                    p_total: total,
-                    p_items: orderItemsPayload
-                });
-                if (fallbackError) throw fallbackError;
-                return continueOrderFlow(fallbackId, address, total, cart);
-            }
 
             if (orderError) throw orderError;
 
@@ -1177,7 +1233,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         checkoutBtn.addEventListener('click', sendOrderViaWhatsApp);
-        useGpsBtn.addEventListener('click', captureGpsLocation);
+        useGpsBtn.addEventListener('click', async () => {
+            try {
+                await captureGpsLocation();
+            } catch (e) {
+                // Error ya manejado dentro de captureGpsLocation
+            }
+        });
+
+        // Permitir recapturar GPS si ya se capturó
+        useGpsBtn.addEventListener('dblclick', resetGpsCapture);
 
         shareAppBtn.addEventListener('click', () => {
             const message = '¡Vengan a probar la comida más rica de DeliciasExpress! 🍔🍕🔥 Hamburguesas, pizza, ensaladas y mucho más, todo delicioso y a un clic de distancia. ¡Los esperamos! 😋\n\n' + window.location.href;
