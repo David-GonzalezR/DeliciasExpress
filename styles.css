@@ -872,6 +872,21 @@ select {
   outline: 2px solid var(--color-primario);
   outline-offset: 1px;
 }
+.save-address-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: var(--espaciado-3);
+  font-size: 0.875rem;
+  color: var(--color-texto-secundario);
+  cursor: pointer;
+  user-select: none;
+}
+.save-address-label input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--color-primario);
+}
 
 .cart-summary {
   display: flex;

@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const useGpsBtn = document.getElementById('use-gps-btn');
     const gpsStatus = document.getElementById('gps-status');
     const customerPhoneInput = document.getElementById('customer-phone');
+    const saveAddressCheckbox = document.getElementById('save-address-checkbox');
 
     // Alerta Personalizada
     const customAlert = document.getElementById('custom-alert');
@@ -642,6 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openCartModal() {
         resetGpsCapture();
         renderCartItems();
+        loadSavedAddressIfLoggedIn();
         showModal(cartModal);
     }
 
@@ -701,6 +703,62 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => cartCountElement.style.transform = 'scale(1)', 200);
         } else {
             cartCountElement.classList.remove('active');
+        }
+    }
+
+    // --- DIRECCIÓN GUARDADA EN PERFIL ---
+    async function loadSavedAddressIfLoggedIn() {
+        if (!currentUser) {
+            // Ocultar checkbox para usuarios anónimos
+            const label = saveAddressCheckbox?.closest('label');
+            if (label) label.style.display = 'none';
+            return;
+        }
+        // Mostrar checkbox para usuarios logueados
+        const label = saveAddressCheckbox?.closest('label');
+        if (label) label.style.display = 'flex';
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('saved_address, saved_lat, saved_lng, phone')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+            if (error) throw error;
+            if (data) {
+                if (data.saved_address && !deliveryAddressInput.value.trim()) {
+                    deliveryAddressInput.value = data.saved_address;
+                }
+                if (data.phone && !customerPhoneInput.value.trim()) {
+                    customerPhoneInput.value = data.phone;
+                }
+                if (data.saved_lat && data.saved_lng && !capturedLat && !capturedLng) {
+                    capturedLat = data.saved_lat;
+                    capturedLng = data.saved_lng;
+                    gpsStatus.textContent = '📍 Usando ubicación guardada';
+                    useGpsBtn.innerHTML = '<i class="fas fa-check-circle"></i> Ubicación guardada cargada';
+                    useGpsBtn.classList.add('gps-captured');
+                }
+            }
+        } catch (e) {
+            console.warn('No se pudo cargar dirección guardada:', e.message);
+        }
+    }
+
+    async function saveAddressToProfile(address, lat, lng, phone) {
+        if (!currentUser) return;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    saved_address: address,
+                    saved_lat: lat,
+                    saved_lng: lng,
+                    phone: phone
+                })
+                .eq('id', currentUser.id);
+            if (error) throw error;
+        } catch (e) {
+            console.warn('No se pudo guardar dirección en perfil:', e.message);
         }
     }
 
@@ -822,6 +880,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (orderError) throw orderError;
+
+            // Guardar dirección en perfil si el usuario está logueado y marcó el checkbox
+            if (currentUser && saveAddressCheckbox?.checked) {
+                const phone = customerPhoneInput ? customerPhoneInput.value.trim() : null;
+                await saveAddressToProfile(address, capturedLat, capturedLng, phone);
+            }
 
             await continueOrderFlow(orderId, address, total, cart);
 
