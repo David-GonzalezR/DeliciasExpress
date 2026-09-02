@@ -1458,6 +1458,78 @@ font-size: 0.9rem;
 }
 .flash-banner-close:hover { opacity: 1; }
 @keyframes flash-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+
+/* --- UPSELL SECTION --- */
+.upsell-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.75rem;
+}
+.upsell-title {
+    margin: 0 0 0.75rem;
+    color: var(--color-texto-principal);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+.upsell-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.upsell-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+}
+.upsell-img {
+    width: 50px;
+    height: 50px;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.upsell-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+.upsell-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-texto-principal);
+}
+.upsell-price {
+    font-size: 0.8rem;
+    color: var(--color-primario);
+    font-weight: 600;
+}
+.upsell-add-btn {
+    flex-shrink: 0;
+}
+
+/* --- BANNER TIENDA CERRADA --- */
+.store-closed-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: #757575;
+  color: #fff;
+  padding: 0.75rem 0;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.store-closed-banner i { margin-right: 0.5rem; font-size: 1.1rem; }
+@media (max-width: 480px) {
+  .store-closed-banner { font-size: 0.9rem; padding: 0.6rem 0; }
+}
+
 @media (max-width: 480px) {
   .flash-banner-inner { gap: 0.5rem; padding-right: 2rem; }
   .flash-banner-inner #flash-banner-text { font-size: 0.82rem; }
@@ -1466,6 +1538,24 @@ font-size: 0.9rem;
   .main-header .container { padding-left: var(--espaciado-3); padding-right: var(--espaciado-3); }
   .modal-footer { flex-direction: column-reverse; }
   .modal-footer .btn { width: 100%; margin: 0; }
+}
+
+/* --- BANNER DE RETRASO --- */
+.delay-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: #fff3cd;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  font-weight: 600;
+  border-bottom: 1px solid #ffeeba;
+}
+.delay-banner i { margin-right: 0.5rem; font-size: 1.1rem; }
+@media (max-width: 480px) {
+  .delay-banner { font-size: 0.9rem; padding: 0.6rem 0.5rem; }
 }
 
 /* --- INFO DEL RIDER EN MODAL DE SEGUIMIENTO (styles.css) --- */
@@ -1506,3 +1596,52 @@ font-size: 0.9rem;
     align-items: center;
     gap: 0.35rem;
 }
+
+/* --- RATING STARS --- */
+.rating-section {
+    text-align: center;
+    padding: 1rem;
+    background: #fff8f0;
+    border: 1px solid #ffe0b2;
+    border-radius: 0.75rem;
+}
+.rating-section h4 {
+    margin: 0 0 0.75rem;
+    color: var(--color-texto-principal);
+    font-size: 1rem;
+}
+.rating-stars {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.rating-stars .star {
+    font-size: 2rem;
+    cursor: pointer;
+    color: #ccc;
+    transition: color 0.15s, transform 0.1s;
+    user-select: none;
+}
+.rating-stars .star:hover {
+    color: #ffc107;
+    transform: scale(1.2);
+}
+.rating-thanks {
+    color: #2e7d32;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* --- FLASH OFFER BADGE --- */
+.badge-flash {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    animation: flash-pulse 1.5s infinite;
+}
+.badge-flash .flash-badge-timer {
+    margin-left: 0.25rem;
+    font-family: var(--fuente-logo, Poppins, sans-serif);
+    font-weight: 700;
+    font-size: 0.75em;
+}
+@keyframes flash-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }

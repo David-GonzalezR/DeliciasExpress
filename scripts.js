@@ -60,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const flashBannerTimer = document.getElementById('flash-banner-timer');
     const flashBannerClose = document.getElementById('flash-banner-close');
 
+    // Banner tienda cerrada
+    const storeClosedBanner = document.getElementById('store-closed-banner');
+
     // Compartir
     const shareAppBtn = document.getElementById('share-app-btn');
 
@@ -111,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let orderPollingInterval = null;
     let currentUser = null;
     let isSignupMode = false;
-    let flashDiscountMap = {};
+    let flashOffersMap = {};
     let flashTimerInterval = null;
     let capturedLat = null;
     let capturedLng = null;
@@ -139,6 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const orderStatuses = {};
     const orderTotals = {};
+    const orderRatings = {};
+    const orderEstimatedReady = {}; // estimated_ready_at por orderId
+    let isStoreOpen = true;
+    let storeDelayMinutes = 0;
+    let storeDelayMessage = '';
 
     // --- INICIALIZACIÓN ---
     function initialize() {
@@ -149,6 +157,54 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDataAndRender();
         updateCartCount();
         initOrderTracking();
+        checkStoreStatus();
+    }
+
+    async function checkStoreStatus() {
+        try {
+            const { data, error } = await supabase.rpc('get_store_status');
+            if (error) throw error;
+            isStoreOpen = data.is_open === true;
+            storeDelayMinutes = data.delay_minutes || 0;
+            storeDelayMessage = data.delay_message || '';
+            updateStoreUI();
+        } catch (e) {
+            console.warn('No se pudo verificar estado de tienda:', e.message);
+        }
+    }
+
+    function updateStoreUI() {
+        if (storeClosedBanner) {
+            storeClosedBanner.style.display = isStoreOpen ? 'none' : 'block';
+        }
+        // Banner de retraso
+        let delayBanner = document.getElementById('delay-banner');
+        if (storeDelayMinutes > 0 && isStoreOpen) {
+            if (!delayBanner) {
+                delayBanner = document.createElement('div');
+                delayBanner.id = 'delay-banner';
+                delayBanner.className = 'delay-banner';
+                delayBanner.style.cssText = 'background:#fff3cd; color:#856404; padding:0.75rem 1rem; text-align:center; font-weight:600; border-bottom:1px solid #ffeeba;';
+                document.body.insertBefore(delayBanner, document.body.firstChild);
+            }
+            delayBanner.innerHTML = `<i class="fas fa-clock"></i> ${storeDelayMessage || `Los pedidos tienen un retraso aproximado de ${storeDelayMinutes} minutos por alta demanda`}`;
+            delayBanner.style.display = 'block';
+        } else if (delayBanner) {
+            delayBanner.style.display = 'none';
+        }
+
+        if (checkoutBtn) {
+            checkoutBtn.disabled = !isStoreOpen || cart.length === 0;
+            if (!isStoreOpen) {
+                checkoutBtn.innerHTML = '<i class="fas fa-lock"></i> Tienda Cerrada';
+                checkoutBtn.style.opacity = '0.6';
+                checkoutBtn.style.cursor = 'not-allowed';
+            } else {
+                checkoutBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Pedido';
+                checkoutBtn.style.opacity = '1';
+                checkoutBtn.style.cursor = 'pointer';
+            }
+        }
     }
 
     // --- MANEJO DE DATOS Y LOCALSTORAGE ---
@@ -223,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadActiveFlashOffers() {
-        flashDiscountMap = {};
+        flashOffersMap = {};
         const { data, error } = await supabase
             .from('flash_offers')
             .select('id, product_id, discount_percentage, ends_at, products ( name )')
@@ -238,7 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const offers = data || [];
         offers.forEach(offer => {
-            flashDiscountMap[offer.product_id] = offer.discount_percentage;
+            flashOffersMap[offer.product_id] = {
+                discount: offer.discount_percentage,
+                endsAt: offer.ends_at
+            };
         });
 
         if (offers.length > 0) {
@@ -259,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (remaining <= 0) {
                 clearInterval(flashTimerInterval);
                 flashTimerInterval = null;
-                flashDiscountMap = {};
+                flashOffersMap = {};
                 hideFlashBanner();
                 renderFilteredProducts();
                 return;
@@ -269,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
             const s = String(totalSec % 60).padStart(2, '0');
             flashBannerTimer.textContent = `${h}:${m}:${s}`;
+            updateFlashBadges();
         };
         tick();
         flashTimerInterval = setInterval(tick, 1000);
@@ -276,10 +336,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hideFlashBanner() {
         flashBanner.style.display = 'none';
+        flashOffersMap = {};
         if (flashTimerInterval) {
             clearInterval(flashTimerInterval);
             flashTimerInterval = null;
         }
+    }
+
+    function updateFlashBadges() {
+        document.querySelectorAll('.flash-badge-timer').forEach(el => {
+            const endsAt = new Date(el.dataset.endsAt).getTime();
+            const remaining = endsAt - Date.now();
+            if (remaining <= 0) {
+                el.textContent = 'Expirado';
+                el.style.color = '#999';
+            } else {
+                const totalSec = Math.floor(remaining / 1000);
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                el.textContent = `${m}:${s}`;
+            }
+        });
     }
 
     function getProductImageUrl(imagePath) {
@@ -316,16 +393,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const basePrice = parseFloat(prod.price) || 0;
             let isOffer = !!prod.is_offer;
             let offerPrice = prod.offer_price ? parseFloat(prod.offer_price) : null;
-            const flashDiscount = flashDiscountMap[prod.id];
-            if (flashDiscount) {
+            const flashOffer = flashOffersMap[prod.id];
+            if (flashOffer) {
                 isOffer = true;
-                offerPrice = Math.round(basePrice * (1 - flashDiscount / 100));
+                offerPrice = Math.round(basePrice * (1 - flashOffer.discount / 100));
             }
 
             return {
                 id: prod.id,
                 name: prod.name,
                 description: prod.description,
+                flashOffer: flashOffer || null,
                 detailedDescription: prod.detailed_description,
                 price: basePrice,
                 imageUrl: getProductImageUrl(prod.image_path),
@@ -358,7 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (currentSearchTerm) {
-            filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(currentSearchTerm.toLowerCase()));
+            const term = currentSearchTerm.toLowerCase();
+            filteredProducts = filteredProducts.filter(p =>
+                p.name.toLowerCase().includes(term) ||
+                (p.description && p.description.toLowerCase().includes(term)) ||
+                (p.category && p.category.toLowerCase().includes(term))
+            );
         }
 
         renderProducts(filteredProducts);
@@ -383,6 +466,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let badgeHtml = '';
             if (product.isOffer) badgeHtml += `<span class="badge badge-offer">Oferta</span>`;
             if (product.isNew) badgeHtml += `<span class="badge badge-new">Nuevo</span>`;
+            if (product.flashOffer) {
+                const endsAt = new Date(product.flashOffer.endsAt).toISOString();
+                badgeHtml += `<span class="badge badge-flash" style="background:#ff6b00;">🔥 -${product.flashOffer.discount}% <span class="flash-badge-timer" data-ends-at="${endsAt}">--:--</span></span>`;
+            }
 
             const outOfStock = product.stock <= 0;
             const buttonHtml = outOfStock
@@ -534,6 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalSpecialInstructions.value = '';
         renderCustomizationOptions();
         updateModalPrice();
+        renderUpsellInProductModal();
         showModal(productModal);
     }
 
@@ -579,6 +667,116 @@ document.addEventListener('DOMContentLoaded', () => {
             customizationTotal += parseFloat(input.dataset.price);
         });
         modalPriceElement.textContent = formatPrice(basePrice + customizationTotal);
+    }
+
+    function getUpsellProducts(excludeCategory = null, limit = 3) {
+        return allProducts
+            .filter(p => p.stock > 0 && p.category && ['bebidas', 'postres', 'bebida', 'postre'].some(c => p.category.toLowerCase().includes(c)))
+            .filter(p => excludeCategory ? p.category !== excludeCategory : true)
+            .slice(0, limit);
+    }
+
+    function renderUpsellInProductModal() {
+        const upsellSection = document.getElementById('modal-upsell-section');
+        const upsellItems = document.getElementById('modal-upsell-items');
+        if (!upsellSection || !upsellItems) return;
+
+        const products = getUpsellProducts(currentModalProduct?.category);
+        if (products.length === 0) {
+            upsellSection.style.display = 'none';
+            return;
+        }
+
+        upsellItems.innerHTML = products.map(p => `
+            <div class="upsell-item">
+                <img src="${p.imageUrl}" alt="${p.name}" class="upsell-img">
+                <div class="upsell-info">
+                    <span class="upsell-name">${p.name}</span>
+                    <span class="upsell-price">${formatPrice(p.isOffer && p.offerPrice ? p.offerPrice : p.price)}</span>
+                </div>
+                <button class="btn btn-primary upsell-add-btn" data-product-id="${p.id}" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
+                    + Agregar
+                </button>
+            </div>
+        `).join('');
+
+        upsellItems.querySelectorAll('.upsell-add-btn').forEach(btn => {
+            btn.addEventListener('click', () => addUpsellToCart(btn.dataset.productId));
+        });
+
+        upsellSection.style.display = 'block';
+    }
+
+    function renderUpsellInCart() {
+        const upsellSection = document.getElementById('cart-upsell-section');
+        const upsellItems = document.getElementById('cart-upsell-items');
+        if (!upsellSection || !upsellItems) return;
+
+        if (cart.length === 0) {
+            upsellSection.style.display = 'none';
+            return;
+        }
+
+        const categoriesInCart = [...new Set(cart.map(item => {
+            const prod = allProducts.find(p => p.id === item.id);
+            return prod?.category;
+        }).filter(Boolean))];
+
+        const products = getUpsellProducts(null, 3).filter(p => !categoriesInCart.includes(p.category));
+        if (products.length === 0) {
+            upsellSection.style.display = 'none';
+            return;
+        }
+
+        upsellItems.innerHTML = products.map(p => `
+            <div class="upsell-item">
+                <img src="${p.imageUrl}" alt="${p.name}" class="upsell-img">
+                <div class="upsell-info">
+                    <span class="upsell-name">${p.name}</span>
+                    <span class="upsell-price">${formatPrice(p.isOffer && p.offerPrice ? p.offerPrice : p.price)}</span>
+                </div>
+                <button class="btn btn-primary upsell-add-btn" data-product-id="${p.id}" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
+                    + Agregar
+                </button>
+            </div>
+        `).join('');
+
+        upsellItems.querySelectorAll('.upsell-add-btn').forEach(btn => {
+            btn.addEventListener('click', () => addUpsellToCart(btn.dataset.productId));
+        });
+
+        upsellSection.style.display = 'block';
+    }
+
+    function addUpsellToCart(productId) {
+        const product = allProducts.find(p => p.id === productId);
+        if (!product || product.stock <= 0) {
+            showCustomAlert('Este producto no está disponible.');
+            return;
+        }
+
+        const basePrice = (product.isOffer && product.offerPrice) ? product.offerPrice : product.price;
+        const itemIdentifier = `${product.id}-[]-`;
+
+        const existingItem = cart.find(item => item.identifier === itemIdentifier);
+        if (existingItem) {
+            existingItem.quantity += 1;
+        } else {
+            cart.push({
+                identifier: itemIdentifier,
+                id: product.id,
+                name: product.name,
+                imageUrl: product.imageUrl,
+                quantity: 1,
+                selectedCustomizations: [],
+                instructions: '',
+                finalPricePerUnit: basePrice
+            });
+        }
+
+        updateCartOnUIAndStorage();
+        showCustomAlert(`"${product.name}" añadido al carrito.`);
+        renderUpsellInCart();
     }
 
     // --- LÓGICA DEL CARRITO DE COMPRAS ---
@@ -644,6 +842,8 @@ document.addEventListener('DOMContentLoaded', () => {
         resetGpsCapture();
         renderCartItems();
         loadSavedAddressIfLoggedIn();
+        updateStoreUI();
+        renderUpsellInCart();
         showModal(cartModal);
     }
 
@@ -762,6 +962,81 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadAccountOrderHistory() {
+        if (!currentUser) return [];
+        try {
+            const { data, error } = await supabase
+                .from('orders')
+                .select('id, status, total, created_at')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+            if (error) throw error;
+            return data || [];
+        } catch (e) {
+            console.warn('No se pudo cargar historial de cuenta:', e.message);
+            return [];
+        }
+    }
+
+    async function loadOrderItemsForReorder(orderId) {
+        try {
+            const { data, error } = await supabase
+                .from('order_items')
+                .select('product_id, quantity, customizations, instructions')
+                .eq('order_id', orderId);
+            if (error) throw error;
+            return data || [];
+        } catch (e) {
+            console.warn('No se pudieron cargar items del pedido:', e.message);
+            return [];
+        }
+    }
+
+    async function reorderFromHistory(orderId) {
+        const items = await loadOrderItemsForReorder(orderId);
+        if (items.length === 0) {
+            showCustomAlert('No se pudieron cargar los productos de ese pedido.');
+            return;
+        }
+
+        for (const item of items) {
+            const product = allProducts.find(p => p.id === item.product_id);
+            if (!product || product.stock <= 0) continue;
+
+            const basePrice = (product.isOffer && product.offerPrice) ? product.offerPrice : product.price;
+            let customizationTotal = 0;
+            const selectedCustomizations = (item.customizations || []).map(c => {
+                customizationTotal += c.price || 0;
+                return { name: c.name, price: c.price || 0 };
+            });
+
+            const finalPricePerUnit = basePrice + customizationTotal;
+            const itemIdentifier = `${product.id}-${JSON.stringify(selectedCustomizations.map(s => s.name).sort())}-${item.instructions || ''}`;
+
+            const existingItem = cart.find(c => c.identifier === itemIdentifier);
+            if (existingItem) {
+                existingItem.quantity += item.quantity;
+            } else {
+                cart.push({
+                    identifier: itemIdentifier,
+                    id: product.id,
+                    name: product.name,
+                    imageUrl: product.imageUrl,
+                    quantity: item.quantity,
+                    selectedCustomizations,
+                    instructions: item.instructions || '',
+                    finalPricePerUnit
+                });
+            }
+        }
+
+        updateCartOnUIAndStorage();
+        showCustomAlert('Productos agregados al carrito con precios actuales.');
+        closeModal(orderStatusModal);
+        openCartModal();
+    }
+
     // --- GUARDAR PEDIDO EN SUPABASE Y ENVIAR POR WHATSAPP ---
 
     function captureGpsLocation() {
@@ -829,6 +1104,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function sendOrderViaWhatsApp() {
+        if (!isStoreOpen) {
+            showCustomAlert('La tienda está cerrada en este momento. No se pueden hacer pedidos.');
+            return;
+        }
         const address = deliveryAddressInput.value.trim();
         if (cart.length === 0) {
             showCustomAlert('Tu carrito está vacío.');
@@ -925,6 +1204,10 @@ document.addEventListener('DOMContentLoaded', () => {
         trackedOrderId = orderId;
         trackOrderButton.style.display = 'inline-flex';
 
+        if (currentUser) {
+            await supabase.rpc('cleanup_old_orders', { p_user_id: currentUser.id, p_keep: 10 });
+        }
+
         showCustomAlert('Tu pedido fue registrado y enviado por WhatsApp. ¡Gracias por tu compra!');
         clearCart();
         closeModal(cartModal);
@@ -937,7 +1220,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function openOrderStatusModal() {
+    async function openOrderStatusModal() {
+        if (currentUser) {
+            const accountOrders = await loadAccountOrderHistory();
+            const accountOrderIds = accountOrders.map(o => o.id);
+            for (const order of accountOrders) {
+                if (!orderStatuses[order.id]) {
+                    orderStatuses[order.id] = order.status;
+                    orderTotals[order.id] = order.total;
+                }
+            }
+            const mergedIds = [...accountOrderIds, ...trackedOrderIds.filter(id => !accountOrderIds.includes(id))].slice(0, 20);
+            trackedOrderIds = mergedIds;
+        }
+
         if (trackedOrderIds.length === 0) return;
         selectedOrderId = selectedOrderId || trackedOrderIds[0];
         showModal(orderStatusModal);
@@ -952,6 +1248,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!error && data && data.length > 0) {
                 orderStatuses[id] = data[0].status;
                 orderTotals[id] = data[0].total;
+                orderRatings[id] = data[0].customer_rating ?? null;
+                if (data[0].estimated_ready_at) {
+                    orderEstimatedReady[id] = data[0].estimated_ready_at;
+                }
             }
         }
         renderOrderStatusList();
@@ -975,14 +1275,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = orderStatuses[id] || 'recibido';
             const label = ORDER_STATUS_LABELS[status] || status;
             const total = orderTotals[id];
+            const isAccountOrder = currentUser ? true : false;
+            const reorderBtn = (status === 'entregado' || status === 'cancelado') && isAccountOrder
+                ? `<button type="button" class="reorder-btn" data-order-id="${id}" style="margin-left:auto; padding:0.25rem 0.5rem; font-size:0.75rem; background:var(--color-primario); color:white; border:none; border-radius:4px; cursor:pointer;">Pedir de nuevo</button>`
+                : '';
             return `<button type="button" class="tracked-order-item${id === selectedOrderId ? ' active' : ''}" data-order-id="${id}">
                 <span class="tracked-order-info">
                     <span class="tracked-order-id">Pedido #${id.slice(0, 8).toUpperCase()}</span>
                     ${total ? `<span class="tracked-order-total">${formatPrice(total)}</span>` : ''}
                 </span>
                 <span class="tracked-order-status">${label}</span>
+                ${reorderBtn}
             </button>`;
         }).join('');
+
+        orderStatusList.querySelectorAll('.reorder-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                reorderFromHistory(btn.dataset.orderId);
+            });
+        });
+
         updateConfirmReceiptButton();
     }
 
@@ -997,6 +1310,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!error && data && data.length > 0) {
             orderStatuses[orderId] = data[0].status;
             orderTotals[orderId] = data[0].total;
+            orderRatings[orderId] = data[0].customer_rating ?? null;
+            // Guardar estimated_ready_at para ETA
+            if (data[0].estimated_ready_at) {
+                orderEstimatedReady[orderId] = data[0].estimated_ready_at;
+            }
             renderOrderStatusList();
             if (selectedOrderId === orderId) {
                 renderOrderStatus(data[0].status, orderId);
@@ -1046,10 +1364,19 @@ document.addEventListener('DOMContentLoaded', () => {
         orderStatusShortId.textContent = orderId.slice(0, 8).toUpperCase();
         orderStatusTotal.textContent = orderTotals[orderId] ? formatPrice(orderTotals[orderId]) : '';
 
+        // Ocultar ETA si el pedido está entregado o cancelado
+        const etaEl = document.getElementById('order-eta');
+        if (etaEl && (status === 'entregado' || status === 'cancelado')) {
+            etaEl.style.display = 'none';
+        } else if (etaEl) {
+            etaEl.style.display = 'block';
+        }
+
         if (status === 'cancelado') {
             orderStatusTimeline.style.display = 'none';
             orderStatusCancelledMsg.style.display = 'block';
             if (orderRiderInfo) orderRiderInfo.style.display = 'none';
+            hideRatingSection();
             updateConfirmReceiptButton();
             return;
         }
@@ -1063,7 +1390,104 @@ document.addEventListener('DOMContentLoaded', () => {
             stepEl.classList.toggle('completed', stepIndex <= currentIndex);
         });
         updateConfirmReceiptButton();
+        // Mostrar ETA si está disponible y el pedido no está entregado/cancelado
+        renderOrderETA(orderId);
         loadOrderRiderInfo(status, orderId);
+
+        const rating = orderRatings[orderId];
+        if (status === 'entregado' && rating === null) {
+            showRatingSection(orderId);
+        } else {
+            hideRatingSection();
+        }
+    }
+
+    function renderOrderETA(orderId) {
+        const estimatedReady = orderEstimatedReady[orderId];
+        if (!estimatedReady) return;
+
+        const readyTime = new Date(estimatedReady).getTime();
+        const now = Date.now();
+        const diffMs = readyTime - now;
+
+        // Crear o actualizar elemento ETA
+        let etaEl = document.getElementById('order-eta');
+        if (!etaEl) {
+            etaEl = document.createElement('div');
+            etaEl.id = 'order-eta';
+            etaEl.style.cssText = 'margin-top:1rem; padding:1rem; background:#f5f5f5; border-radius:8px; text-align:center; font-weight:600; color:#333;';
+            // Insertar después del timeline
+            orderStatusTimeline.parentNode.insertBefore(etaEl, orderStatusTimeline.nextSibling);
+        }
+
+        if (diffMs <= 0) {
+            etaEl.innerHTML = `<i class="fas fa-check-circle" style="color:#28a745;"></i> ¡Tu pedido está listo!`;
+            return;
+        }
+
+        const totalMinutes = Math.ceil(diffMs / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const readyDate = new Date(readyTime);
+        const timeStr = readyDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+        let countdownStr = '';
+        if (hours > 0) {
+            countdownStr = `${hours}h ${minutes}min`;
+        } else {
+            countdownStr = `${minutes} min`;
+        }
+
+        etaEl.innerHTML = `
+            <div style="font-size:0.9rem; color:#666; margin-bottom:0.25rem;">Tiempo estimado de llegada</div>
+            <div style="font-size:1.25rem; color:var(--color-primario);">≈ ${timeStr}</div>
+            <div style="font-size:0.85rem; color:#666; margin-top:0.25rem;">(${countdownStr})</div>
+        `;
+    }
+        const container = document.getElementById('rating-section');
+        if (container) {
+            container.innerHTML = `
+                <div class="rating-section">
+                    <h4>¿Cómo estuvo tu pedido?</h4>
+                    <div class="rating-stars" data-order-id="${orderId}">
+                        ${[1,2,3,4,5].map(n => `<span class="star" data-value="${n}">☆</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            container.style.display = 'block';
+            container.querySelectorAll('.star').forEach(star => {
+                star.addEventListener('click', () => submitRating(orderId, parseInt(star.dataset.value)));
+                star.addEventListener('mouseover', () => highlightStars(star.dataset.value));
+                star.addEventListener('mouseout', () => highlightStars(rating));
+            });
+        }
+    }
+
+    function hideRatingSection() {
+        const container = document.getElementById('rating-section');
+        if (container) container.style.display = 'none';
+    }
+
+    function highlightStars(val) {
+        document.querySelectorAll('#rating-section .star').forEach(star => {
+            star.textContent = parseInt(star.dataset.value) <= (val || 0) ? '★' : '☆';
+            star.style.color = parseInt(star.dataset.value) <= (val || 0) ? '#ffc107' : '#ccc';
+        });
+    }
+
+    async function submitRating(orderId, rating) {
+        const { data, error } = await supabase.rpc('rate_order', { p_order_id: orderId, p_rating: rating });
+        if (error || !data?.ok) {
+            showCustomAlert('No se pudo enviar la calificación. Intenta de nuevo.');
+            return;
+        }
+        orderRatings[orderId] = rating;
+        const container = document.getElementById('rating-section');
+        if (container) {
+            container.innerHTML = '<div class="rating-thanks">¡Gracias por tu calificación!</div>';
+            setTimeout(() => { container.style.display = 'none'; }, 3000);
+        }
+        refreshTrackedOrders();
     }
 
     async function loadOrderRiderInfo(status, orderId) {

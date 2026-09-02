@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const ordersContainer = document.getElementById('orders-container');
     const ordersEmptyMessage = document.getElementById('orders-empty-message');
     const statusFilterButtons = document.querySelectorAll('.status-filter-btn');
+    const storeToggle = document.getElementById('store-toggle');
+    const storeToggleLabel = document.getElementById('store-toggle-label');
+    const delayMinutesInput = document.getElementById('delay-minutes-input');
+    const delayMessageInput = document.getElementById('delay-message-input');
+    const saveDelayBtn = document.getElementById('save-delay-btn');
 
     // Productos
     const sidebarButtons = document.querySelectorAll('.sidebar-btn');
@@ -86,6 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const riderPromoteBtn = document.getElementById('rider-promote-btn');
     const ridersContainer = document.getElementById('riders-container');
     const ridersEmptyMessage = document.getElementById('riders-empty-message');
+
+    // Resumen / Dashboard
+    const resumenView = document.getElementById('resumen-view');
+    const metricSalesToday = document.getElementById('metric-sales-today');
+    const metricOrdersToday = document.getElementById('metric-orders-today');
+    const metricAvgTicket = document.getElementById('metric-avg-ticket');
+    const metricAvgDeliveryTime = document.getElementById('metric-avg-delivery-time');
+    const metricOrdersByStatus = document.getElementById('metric-orders-by-status');
+    const metricTopProducts = document.getElementById('metric-top-products');
     // Modal crear domiciliario
     const newRiderBtn = document.getElementById('new-rider-btn');
     const riderModal = document.getElementById('rider-modal');
@@ -147,9 +161,24 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard.style.display = 'none';
     }
 
+    async function loadStoreStatus() {
+        try {
+            const { data, error } = await supabase.rpc('get_store_status');
+            if (error) throw error;
+            const isOpen = data.is_open === true;
+            storeToggle.checked = isOpen;
+            storeToggleLabel.textContent = isOpen ? '🟢 Abierta' : '🔴 Cerrada';
+            delayMinutesInput.value = data.delay_minutes || 0;
+            delayMessageInput.value = data.delay_message || '';
+        } catch (e) {
+            console.warn('No se pudo cargar estado de tienda:', e.message);
+        }
+    }
+
     function showDashboard() {
         loginScreen.style.display = 'none';
         dashboard.style.display = 'block';
+        loadStoreStatus();
         loadOrders();
         subscribeToOrders();
         loadAdminProducts();
@@ -183,6 +212,54 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ordersChannel) supabase.removeChannel(ordersChannel);
         await supabase.auth.signOut();
         showLogin();
+    });
+
+    storeToggle.addEventListener('change', async () => {
+        const isOpen = storeToggle.checked;
+        storeToggleLabel.textContent = isOpen ? '🟢 Abierta' : '🔴 Cerrada';
+        storeToggle.disabled = true;
+        try {
+            const { error } = await supabase
+                .from('app_settings')
+                .update({ value: isOpen ? 'true' : 'false' })
+                .eq('key', 'store_open');
+            if (error) throw error;
+        } catch (e) {
+            console.error('Error guardando estado tienda:', e);
+            storeToggle.checked = !isOpen;
+            storeToggleLabel.textContent = isOpen ? '🔴 Cerrada' : '🟢 Abierta';
+            alert('No se pudo cambiar el estado. Intenta de nuevo.');
+        } finally {
+            storeToggle.disabled = false;
+        }
+    });
+
+    saveDelayBtn.addEventListener('click', async () => {
+        const minutes = parseInt(delayMinutesInput.value) || 0;
+        const message = delayMessageInput.value.trim();
+        saveDelayBtn.disabled = true;
+        saveDelayBtn.textContent = 'Guardando...';
+        try {
+            const { error: err1 } = await supabase
+                .from('app_settings')
+                .update({ value: String(minutes) })
+                .eq('key', 'store_delay_minutes');
+            if (err1) throw err1;
+
+            const { error: err2 } = await supabase
+                .from('app_settings')
+                .update({ value: message })
+                .eq('key', 'store_delay_message');
+            if (err2) throw err2;
+
+            alert('Retraso guardado correctamente');
+        } catch (e) {
+            console.error('Error guardando retraso:', e);
+            alert('No se pudo guardar el retraso. Intenta de nuevo.');
+        } finally {
+            saveDelayBtn.disabled = false;
+            saveDelayBtn.textContent = 'Guardar';
+        }
     });
 
     // --- CARGA DE PEDIDOS ---
@@ -222,6 +299,112 @@ document.addEventListener('DOMContentLoaded', () => {
         allOrders = data || [];
         await loadRiderNames(allOrders.map(o => o.assigned_rider_id));
         renderOrders();
+    }
+
+    // --- MÉTRICAS DEL DASHBOARD (Resumen) ---
+    async function loadMetrics() {
+        try {
+            // 1. Ventas de hoy, pedidos hoy, ticket promedio
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date();
+            todayEnd.setHours(23, 59, 59, 999);
+
+            const { data: ordersToday, error: ordersError } = await supabase
+                .from('orders')
+                .select('total, status, created_at, delivered_at, order_items ( product_name, quantity, unit_price )')
+                .gte('created_at', todayStart.toISOString())
+                .lte('created_at', todayEnd.toISOString())
+                .neq('status', 'cancelado');
+
+            if (ordersError) throw ordersError;
+
+            const orders = ordersToday || [];
+            const salesToday = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+            const ordersCount = orders.length;
+            const avgTicket = ordersCount > 0 ? salesToday / ordersCount : 0;
+
+            metricSalesToday.textContent = formatPrice(salesToday);
+            metricOrdersToday.textContent = ordersCount;
+            metricAvgTicket.textContent = formatPrice(avgTicket);
+
+            // 2. Pedidos por estado (hoy)
+            const statusCounts = {};
+            orders.forEach(o => {
+                statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
+            });
+            metricOrdersByStatus.innerHTML = Object.entries(statusCounts)
+                .sort((a, b) => b[1] - a[1])
+                .map(([status, count]) => `
+                    <div class="status-count-row">
+                        <span class="status-count-label">${STATUS_LABELS[status] || status}</span>
+                        <span class="status-count-value">${count}</span>
+                    </div>
+                `).join('') || '<p class="no-data">Sin pedidos hoy</p>';
+
+            // 3. Top 5 productos más vendidos (últimos 30 días, excluyendo cancelados)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const { data: recentOrders, error: recentError } = await supabase
+                .from('orders')
+                .select('order_items ( product_name, quantity )')
+                .gte('created_at', thirtyDaysAgo.toISOString())
+                .neq('status', 'cancelado');
+
+            if (!recentError && recentOrders) {
+                const productSales = {};
+                recentOrders.forEach(o => {
+                    (o.order_items || []).forEach(item => {
+                        const name = item.product_name;
+                        const qty = item.quantity || 0;
+                        productSales[name] = (productSales[name] || 0) + qty;
+                    });
+                });
+                const top5 = Object.entries(productSales)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5);
+                metricTopProducts.innerHTML = top5.length > 0
+                    ? top5.map(([name, qty], i) => `
+                        <div class="top-product-row">
+                            <span class="top-product-rank">${i + 1}</span>
+                            <span class="top-product-name">${name}</span>
+                            <span class="top-product-qty">${qty} vendidos</span>
+                        </div>
+                    `).join('')
+                    : '<p class="no-data">Sin datos</p>';
+            }
+
+            // 4. Tiempo promedio de entrega (últimos 7 días, solo entregados)
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+            const { data: deliveredOrders, error: deliveredError } = await supabase
+                .from('orders')
+                .select('created_at, delivered_at')
+                .eq('status', 'entregado')
+                .gte('created_at', sevenDaysAgo.toISOString())
+                .not('delivered_at', 'is', null);
+
+            if (!deliveredError && deliveredOrders && deliveredOrders.length > 0) {
+                const totalMinutes = deliveredOrders.reduce((sum, o) => {
+                    const created = new Date(o.created_at).getTime();
+                    const delivered = new Date(o.delivered_at).getTime();
+                    return sum + (delivered - created) / 60000;
+                }, 0);
+                const avgMinutes = Math.round(totalMinutes / deliveredOrders.length);
+                metricAvgDeliveryTime.textContent = `${avgMinutes} min`;
+            } else {
+                metricAvgDeliveryTime.textContent = '-- min';
+            }
+
+        } catch (e) {
+            console.error('Error cargando métricas:', e);
+            metricSalesToday.textContent = 'Error';
+            metricOrdersToday.textContent = 'Error';
+            metricAvgTicket.textContent = 'Error';
+            metricAvgDeliveryTime.textContent = 'Error';
+        }
     }
 
     function subscribeToOrders() {
@@ -435,6 +618,14 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('No se pudo actualizar el pedido. Intenta de nuevo.');
             return;
         }
+        // Si el pedido pasa a 'preparando', calcular y guardar estimated_ready_at
+        if (newStatus === 'preparando') {
+            try {
+                await supabase.rpc('set_estimated_ready_at', { p_order_id: orderId });
+            } catch (e) {
+                console.warn('No se pudo calcular ETA:', e.message);
+            }
+        }
         const idx = allOrders.findIndex(o => o.id === orderId);
         if (idx !== -1) {
             allOrders[idx].status = newStatus;
@@ -514,10 +705,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- NAVEGACIÓN ENTRE VISTAS ---
     function showView(view) {
         sidebarButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+        resumenView.style.display = view === 'resumen' ? 'block' : 'none';
         pedidosView.style.display = view === 'pedidos' ? 'block' : 'none';
         productosView.style.display = view === 'productos' ? 'block' : 'none';
         ofertasView.style.display = view === 'ofertas' ? 'block' : 'none';
         domiciliariosView.style.display = view === 'domiciliarios' ? 'block' : 'none';
+        if (view === 'resumen') loadMetrics();
     }
 
     // --- GESTIÓN DE DOMICILIARIOS ---

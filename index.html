@@ -10,6 +10,11 @@
 </head>
 <body>
 
+    <div id="store-closed-banner" class="store-closed-banner" style="display:none;">
+        <i class="fas fa-lock"></i>
+        <span>Estamos cerrados en este momento. ¡Vuelve pronto!</span>
+    </div>
+
     <div id="flash-banner" class="flash-banner" style="display:none;">
         <div class="container flash-banner-inner">
             <span id="flash-banner-text">🔥 ¡OFERTA RELÁMPAGO!</span>
@@ -103,6 +108,10 @@
                 </div>
                  <div id="modal-customization-section" class="customization-section">
                     </div>
+                <div id="modal-upsell-section" class="upsell-section" style="display:none;">
+                    <h4 class="upsell-title">Complementa tu pedido</h4>
+                    <div id="modal-upsell-items" class="upsell-items"></div>
+                </div>
                 <div class="special-instructions-section">
                     <h4 class="special-instructions-title">Instrucciones Especiales:</h4>
                     <textarea id="modal-special-instructions" class="special-instructions-textarea" rows="3" placeholder="Ej: Sin cebolla, doble queso..."></textarea>
@@ -126,6 +135,10 @@
             </div>
             <div id="cart-items-container" class="modal-body-scrollable cart-items-container">
                 <p id="empty-cart-message" class="empty-cart-message">Tu carrito está vacío.</p>
+            </div>
+            <div id="cart-upsell-section" class="upsell-section" style="display:none;">
+                <h4 class="upsell-title">¿Quieres agregar algo más?</h4>
+                <div id="cart-upsell-items" class="upsell-items"></div>
             </div>
              <div class="cart-delivery-section">
                 <h4 class="delivery-address-title">Dirección de Entrega:</h4>
@@ -181,6 +194,7 @@
                 </div>
                 <p id="order-status-cancelled-msg" style="display:none; color: var(--color-primario); font-weight: 600; margin-top: var(--espaciado-4);">Este pedido fue cancelado.</p>
                 <button id="confirm-receipt-btn" class="btn btn-primary" style="display:none; width: 100%;">Confirmar que recibí mi pedido</button>
+                <div id="rating-section" style="display:none; margin-top: var(--espaciado-4);"></div>
             </div>
             <div class="modal-footer">
                 <button id="forget-order-btn" class="btn btn-secondary">Ya no seguir estos pedidos</button>

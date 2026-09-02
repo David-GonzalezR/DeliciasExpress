@@ -29,6 +29,20 @@
         <header class="admin-header">
             <h1 class="admin-logo">DeliciasExpress <span>· Panel</span></h1>
             <div class="admin-header-right">
+                <label class="store-toggle" title="Tienda abierta/cerrada">
+                    <input type="checkbox" id="store-toggle" checked>
+                    <span class="store-toggle-slider"></span>
+                    <span id="store-toggle-label" class="store-toggle-label">🟢 Abierta</span>
+                </label>
+                <div id="delay-controls" class="delay-controls" style="display:flex; align-items:center; gap:0.75rem; margin-left:1rem; padding-left:1rem; border-left:1px solid var(--color-borde);">
+                    <label class="delay-input-group" title="Minutos extra de retraso para todos los pedidos">
+                        <span class="delay-input-label">⏱️ Retraso:</span>
+                        <input type="number" id="delay-minutes-input" min="0" max="120" value="0" style="width:60px; padding:0.25rem 0.5rem; font-size:0.875rem;">
+                        <span class="delay-input-unit">min</span>
+                    </label>
+                    <input type="text" id="delay-message-input" placeholder="Mensaje (ej: Alta demanda)" style="width:180px; padding:0.25rem 0.5rem; font-size:0.875rem;" title="Mensaje que verá el cliente">
+                    <button id="save-delay-btn" class="btn btn-secondary" style="padding:0.25rem 0.75rem; font-size:0.8rem;">Guardar</button>
+                </div>
                 <span id="realtime-indicator" class="realtime-indicator"><i class="fas fa-circle"></i> En vivo</span>
                 <button id="logout-btn" class="btn btn-secondary admin-logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</button>
             </div>
@@ -36,13 +50,59 @@
 
         <div class="admin-layout">
             <aside class="admin-sidebar">
-                <button class="sidebar-btn active" data-view="pedidos"><i class="fas fa-receipt"></i> Pedidos</button>
+                <button class="sidebar-btn active" data-view="resumen"><i class="fas fa-chart-bar"></i> Resumen</button>
+                <button class="sidebar-btn" data-view="pedidos"><i class="fas fa-receipt"></i> Pedidos</button>
                 <button class="sidebar-btn" data-view="productos"><i class="fas fa-utensils"></i> Productos</button>
                 <button class="sidebar-btn" data-view="ofertas"><i class="fas fa-bolt"></i> Ofertas</button>
                 <button class="sidebar-btn" data-view="domiciliarios"><i class="fas fa-motorcycle"></i> Domiciliarios</button>
             </aside>
 
             <div class="admin-content">
+                <section id="resumen-view" class="productos-view" style="display:none;">
+                    <h2>Resumen del Día</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon sales"><i class="fas fa-cash-register"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Ventas de hoy</span>
+                                <span id="metric-sales-today" class="metric-value">COP $0</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon orders"><i class="fas fa-receipt"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Pedidos hoy</span>
+                                <span id="metric-orders-today" class="metric-value">0</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon avg-ticket"><i class="fas fa-chart-line"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Ticket promedio</span>
+                                <span id="metric-avg-ticket" class="metric-value">COP $0</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon avg-time"><i class="fas fa-clock"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Tiempo prom. entrega (7d)</span>
+                                <span id="metric-avg-delivery-time" class="metric-value">-- min</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-section">
+                        <div class="metric-panel">
+                            <h3>Pedidos por estado</h3>
+                            <div id="metric-orders-by-status" class="status-breakdown"></div>
+                        </div>
+                        <div class="metric-panel">
+                            <h3>Top 5 productos más vendidos</h3>
+                            <div id="metric-top-products" class="top-products-list"></div>
+                        </div>
+                    </div>
+                </section>
+
                 <section id="pedidos-view">
                     <nav class="status-filter-bar">
                         <button class="status-filter-btn active" data-status="activos">Activos</button>
