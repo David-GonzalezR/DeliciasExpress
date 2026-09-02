@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/David-GonzalezR/DeliciasExpress/issues"
   },
-  "homepage": "https://github.com/David-GonzalezR/DeliciasExpress#readme"
+  "homepage": "https://github.com/David-GonzalezR/DeliciasExpress#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4"
+  }
 }
