@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .select(`
                 id, delivery_address, status, total, created_at,
                 assigned_rider_id, delivery_requested_at, delivered_at,
-                delivery_lat, delivery_lng, customer_phone,
+                delivery_lat, delivery_lng, customer_phone, acknowledged_at,
                 order_items ( id, product_name, quantity, unit_price, customizations, instructions )
             `)
             .order('created_at', { ascending: false })
@@ -595,15 +595,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderOrders();
             }
         } else if (btn.dataset.action === 'request-delivery') {
-            const { error } = await supabase.from('orders').update({ status: 'buscando_domiciliario', delivery_requested_at: new Date().toISOString() }).eq('id', orderId);
-            if (error) {
-                console.error('Error request-delivery:', error);
-                alert('No se pudo solicitar el domiciliario. Intenta de nuevo.');
+            const { data: rpcData, error } = await supabase.rpc('request_delivery', { p_order_id: orderId });
+            if (error || !rpcData?.ok) {
+                console.error('Error request-delivery:', error || rpcData?.error);
+                alert('No se pudo solicitar el domiciliario: ' + (rpcData?.error || error?.message || 'Intenta de nuevo.'));
                 btn.disabled = false;
                 return;
             }
             const idx = allOrders.findIndex(o => o.id === orderId);
-            if (idx !== -1) { allOrders[idx].status = 'buscando_domiciliario'; renderOrders(); }
+            if (idx !== -1) {
+                allOrders[idx].status = 'buscando_domiciliario';
+                allOrders[idx].delivery_requested_at = new Date().toISOString();
+                renderOrders();
+            }
         } else if (btn.dataset.action === 'cancel-delivery-request') {
             if (!confirm('¿Cancelar la solicitud de domicilio? El pedido volverá a "Preparando".')) {
                 btn.disabled = false;
