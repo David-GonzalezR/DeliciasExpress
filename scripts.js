@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const orderTotals = {};
     const orderRatings = {};
     const orderEstimatedReady = {}; // estimated_ready_at por orderId
+    const orderAcknowledgedAt = {}; // acknowledged_at por orderId
     let isStoreOpen = true;
     let storeDelayMinutes = 0;
     let storeDelayMessage = '';
@@ -255,16 +256,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderProductsLoadingState();
         try {
             await loadActiveFlashOffers();
+            // Consulta simple primero para diagnosticar
             const { data, error } = await supabase
                 .from('products')
-                .select(`
-                    id, name, description, detailed_description, price, offer_price,
-                    is_offer, is_new, category, stock, image_path,
-                    customization_groups (
-                        id, group_title, type, default_option_id, sort_order,
-                        customization_options!customization_options_group_id_fkey ( id, name, price, sort_order )
-                    )
-                `)
+                .select('id, name, description, detailed_description, price, offer_price, is_offer, is_new, category, stock, image_path')
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
@@ -274,6 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error al cargar productos desde Supabase:', error);
+            const loadingMessage = document.getElementById('category-loading-message');
+            if (loadingMessage) loadingMessage.remove();
             renderProductsErrorState();
         }
     }
@@ -370,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return data.publicUrl;
     }
 
-    // --- PROCESAMIENTO DE DATOS ---
     function processProducts(rows) {
         return rows.map(prod => {
             const groups = (prod.customization_groups || [])
@@ -589,6 +585,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function showCustomAlert(message) {
         customAlertMessage.textContent = message;
         showModal(customAlert);
+    }
+
+    function showOrderAcknowledgedNotification(orderId) {
+        const shortId = orderId.slice(0, 8).toUpperCase();
+        showCustomAlert(`✅ Tu pedido #${shortId} ha sido visto por el restaurante y está siendo preparado.`);
     }
 
     // --- LÓGICA DEL CARRUSEL ---
@@ -967,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const { data, error } = await supabase
                 .from('orders')
-                .select('id, status, total, created_at')
+                .select('id, status, total, created_at, acknowledged_at')
                 .eq('user_id', currentUser.id)
                 .order('created_at', { ascending: false })
                 .limit(10);
@@ -1229,6 +1230,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     orderStatuses[order.id] = order.status;
                     orderTotals[order.id] = order.total;
                 }
+                if (order.acknowledged_at) {
+                    orderAcknowledgedAt[order.id] = order.acknowledged_at;
+                }
             }
             const mergedIds = [...accountOrderIds, ...trackedOrderIds.filter(id => !accountOrderIds.includes(id))].slice(0, 20);
             trackedOrderIds = mergedIds;
@@ -1251,6 +1255,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 orderRatings[id] = data[0].customer_rating ?? null;
                 if (data[0].estimated_ready_at) {
                     orderEstimatedReady[id] = data[0].estimated_ready_at;
+                }
+                if (data[0].acknowledged_at && !orderAcknowledgedAt[id]) {
+                    orderAcknowledgedAt[id] = data[0].acknowledged_at;
+                    showOrderAcknowledgedNotification(id);
                 }
             }
         }
@@ -1315,6 +1323,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data[0].estimated_ready_at) {
                 orderEstimatedReady[orderId] = data[0].estimated_ready_at;
             }
+            // Guardar acknowledged_at y notificar si es nuevo
+            if (data[0].acknowledged_at && !orderAcknowledgedAt[orderId]) {
+                orderAcknowledgedAt[orderId] = data[0].acknowledged_at;
+                showOrderAcknowledgedNotification(orderId);
+            }
             renderOrderStatusList();
             if (selectedOrderId === orderId) {
                 renderOrderStatus(data[0].status, orderId);
@@ -1346,10 +1359,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 table: 'orders',
                 filter: `id=eq.${orderId}`
             }, payload => {
-                orderStatuses[orderId] = payload.new.status;
+                const oldStatus = orderStatuses[orderId];
+                const newStatus = payload.new.status;
+                orderStatuses[orderId] = newStatus;
+                
+                // Check if order was just acknowledged
+                if (!orderAcknowledgedAt[orderId] && payload.new.acknowledged_at) {
+                    orderAcknowledgedAt[orderId] = payload.new.acknowledged_at;
+                    showOrderAcknowledgedNotification(orderId);
+                }
+                
                 renderOrderStatusList();
                 if (selectedOrderId === orderId) {
-                    renderOrderStatus(payload.new.status, orderId);
+                    renderOrderStatus(newStatus, orderId);
                 }
             })
             .subscribe();
@@ -1444,6 +1466,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div style="font-size:0.85rem; color:#666; margin-top:0.25rem;">(${countdownStr})</div>
         `;
     }
+
+    function showRatingSection(orderId) {
+        const rating = orderRatings[orderId];
         const container = document.getElementById('rating-section');
         if (container) {
             container.innerHTML = `

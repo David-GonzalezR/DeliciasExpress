@@ -371,6 +371,8 @@ body {
 .order-card.status-entregado .btn-status-advance:hover { background: #1b5e20; }
 .btn-status-cancel { background: #fff; color: #b71c1c; border: 1px solid #f0c7c7; }
 .btn-status-cancel:hover { background: #fdecea; }
+.btn-status-acknowledge { background: #2e7d32; color: #fff; }
+.btn-status-acknowledge:hover { background: #1b5e20; }
 
 @media (max-width: 480px) {
   .orders-container { grid-template-columns: 1fr; padding: 0 1rem 2rem; }

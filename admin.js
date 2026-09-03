@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATUS_LABELS = {
         recibido: 'Recibido',
         preparando: 'Preparando',
-        despachado: 'Listo para envío',   // estado interno legacy, no debe aparecer normalmente
+        despachado: 'Listo para envío',
         buscando_domiciliario: 'Buscando domiciliario',
         en_camino: 'En camino',
         entregado: 'Entregado',
@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const NEXT_ACTION_LABEL = {
         recibido: 'Marcar Preparando'
-        // 'preparando' no avanza con botón de texto; usa el botón "Buscar Domiciliario"
     };
 
     // --- DOM ---
@@ -505,6 +504,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         let actionsHtml = '';
+        if (order.status === 'recibido' && !order.acknowledged_at) {
+            actionsHtml += `<button class="btn btn-status-acknowledge" data-action="acknowledge" data-id="${order.id}">
+                <i class="fas fa-check-circle"></i> Visto
+            </button>`;
+        }
         if (STATUS_FLOW.includes(order.status) && NEXT_ACTION_LABEL[order.status]) {
             actionsHtml += `<button class="btn btn-status-advance" data-action="advance" data-id="${order.id}" data-current="${order.status}">${NEXT_ACTION_LABEL[order.status]}</button>`;
         }
@@ -577,6 +581,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentStatus = btn.dataset.current;
             const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(currentStatus) + 1];
             await updateOrderStatus(orderId, nextStatus);
+        } else if (btn.dataset.action === 'acknowledge') {
+            const { data, error } = await supabase.rpc('acknowledge_order', { p_order_id: orderId });
+            if (error || !data?.ok) {
+                console.error('Error acknowledging order:', error || data?.error);
+                alert('No se pudo marcar como visto: ' + (data?.error || error?.message || 'Intenta de nuevo.'));
+                btn.disabled = false;
+                return;
+            }
+            const idx = allOrders.findIndex(o => o.id === orderId);
+            if (idx !== -1) {
+                allOrders[idx].acknowledged_at = data.acknowledged_at;
+                renderOrders();
+            }
         } else if (btn.dataset.action === 'request-delivery') {
             const { error } = await supabase.from('orders').update({ status: 'buscando_domiciliario', delivery_requested_at: new Date().toISOString() }).eq('id', orderId);
             if (error) {
