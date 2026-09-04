@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildMapsLink(order) {
         if (order.delivery_lat && order.delivery_lng) {
-            return `https://www.google.com/maps?q=${order.delivery_lat},${order.delivery_lng}`;
+            return `https://www.google.com/maps/search/?api=1&query=${order.delivery_lat},${order.delivery_lng}`;
         }
         if (order.delivery_address) {
             return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`;
