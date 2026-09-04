@@ -344,7 +344,9 @@ select {
   justify-content: space-between;
   align-items: center;
   gap: var(--espaciado-4);
+  flex-wrap: wrap;
 }
+.search-container { min-width: 0; }
 .current-category-title {
   font-size: 1.875rem; /* text-3xl */
   font-weight: 700;
@@ -907,6 +909,7 @@ select {
 .cart-actions {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: var(--espaciado-3);
 }
 .cart-actions .btn {
@@ -1252,6 +1255,13 @@ font-size: 0.9rem;
 .order-status-step span {
     font-size: 0.75rem;
     font-weight: 600;
+    word-break: break-word;
+}
+@media (max-width: 480px) {
+    .order-status-step i { width: 30px; height: 30px; font-size: 0.85rem; }
+    .order-status-step span { font-size: 0.62rem; }
+    .order-status-timeline::before { top: 15px; }
+    .user-dropdown { min-width: 190px; }
 }
 .order-status-step.completed i {
     background: var(--color-primario);
@@ -1569,8 +1579,10 @@ font-size: 0.9rem;
 .rider-info-card {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 1rem;
 }
+.rider-info-details { flex: 1; min-width: 0; word-break: break-word; }
 .rider-info-photo {
     width: 60px;
     height: 60px;

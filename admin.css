@@ -23,6 +23,8 @@ body {
   color: var(--color-texto-principal);
 }
 
+img { max-width: 100%; height: auto; }
+
 .btn {
   border: none;
   cursor: pointer;
@@ -101,14 +103,16 @@ body {
 .admin-header {
   background: var(--color-fondo-tarjeta);
   border-bottom: 1px solid var(--color-borde);
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 64px;
+  min-height: 64px;
   box-sizing: border-box;
 }
 .admin-logo {
@@ -119,7 +123,7 @@ body {
   color: var(--color-texto-principal);
 }
 .admin-logo span { color: var(--color-primario); font-weight: 600; }
-.admin-header-right { display: flex; align-items: center; gap: 1rem; }
+.admin-header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .realtime-indicator {
   font-size: 0.75rem;
   color: #2e7d32;
@@ -173,6 +177,8 @@ body {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
 }
 .delay-input-group {
     display: flex;
@@ -273,7 +279,7 @@ body {
 .orders-container {
   padding: 0 1.5rem 2.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 1rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -437,7 +443,7 @@ body {
 .products-container {
   padding: 0 1.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 1rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -696,27 +702,51 @@ body {
     min-height: auto;
     border-right: none;
     border-bottom: 1px solid var(--color-borde);
+    overflow-x: auto;
   }
-  .sidebar-btn { width: auto; flex: 1; justify-content: center; }
+  .sidebar-btn { width: auto; flex: 1 0 auto; justify-content: center; white-space: nowrap; }
+
+  /* Controles del header en pantallas medianas/pequeñas */
+  .delay-controls {
+    flex-basis: 100%;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    border-left: none !important;
+  }
+  #delay-message-input { flex: 1 1 140px; width: auto !important; }
+  .metrics-grid, .metrics-section { padding-left: 1rem; padding-right: 1rem; }
+  .metric-card { padding: 1rem; gap: 0.75rem; }
+  .metric-icon { width: 46px; height: 46px; font-size: 1.2rem; }
 }
 
 @media (max-width: 480px) {
-  .admin-header { padding: 0.8rem 1rem; }
-  .admin-logo { font-size: 1rem; }
-  .admin-sidebar { padding: 0.5rem; gap: 0.2rem; }
-  .sidebar-btn { font-size: 0.8rem; padding: 0.5rem 0.4rem; gap: 0.35rem; }
-  .productos-header { padding: 1rem 1rem 0.5rem; }
-  .products-container { padding: 0 1rem; }
+  .admin-header { padding: 0.6rem 0.75rem; }
+  .admin-logo { font-size: 0.95rem; }
+  .realtime-indicator { font-size: 0.7rem; }
+  .store-toggle { margin-left: 0; gap: 0.35rem; }
+  .store-toggle-label { min-width: 0; font-size: 0.72rem; }
+  .admin-logout-btn { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+  .admin-sidebar { padding: 0.4rem; gap: 0.2rem; }
+  .sidebar-btn { font-size: 0.78rem; padding: 0.5rem 0.45rem; gap: 0.3rem; }
+  .status-filter-bar { padding: 0.75rem; }
+  .orders-container { padding: 0 0.75rem 1.5rem; }
+  .productos-header { padding: 1rem 0.75rem 0.5rem; }
+  .products-container { padding: 0 0.75rem; }
+  .riders-promote-row .form-field input { min-width: 0; width: 100%; }
   .form-row { flex-direction: column; gap: 0.85rem; }
-  .modal-overlay { padding: 0.75rem; }
+  .modal-overlay { padding: 0.5rem; }
   .modal-box { max-height: 92vh; }
-  .modal-header, .product-form { padding-left: 1rem; padding-right: 1rem; }
+  .modal-header, .product-form { padding-left: 0.85rem; padding-right: 0.85rem; }
+  .metric-value { font-size: 1.05rem; }
+  .rider-profile-card { margin: 1rem auto; padding: 1.25rem; }
+  .rider-stats { gap: 1rem; }
+  .stat-value { font-size: 1.4rem; }
 }
 
 /* --- DASHBOARD RESUMEN / MÉTRICAS --- */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 1rem;
   padding: 1.25rem 1.5rem;
   max-width: 1400px;
@@ -777,7 +807,7 @@ body {
 
 .metrics-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
   gap: 1rem;
   padding: 0 1.5rem 2rem;
   max-width: 1400px;
