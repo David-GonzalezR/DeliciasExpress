@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Compartir
     const shareAppBtn = document.getElementById('share-app-btn');
+    const enablePushBtn = document.getElementById('enable-push-btn');
 
     // Autenticación (DOM)
     const authModal = document.getElementById('auth-modal');
@@ -591,6 +592,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const shortId = orderId.slice(0, 8).toUpperCase();
         showCustomAlert(`✅ Tu pedido #${shortId} ha sido visto por el restaurante y está siendo preparado.`);
     }
+
+    // --- INICIALIZACIÓN PWA Y PUSH NOTIFICATIONS ---
+    async function initPWA() {
+        if ('Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window) {
+            const alreadySubscribed = await PushManager.isSubscribed();
+            if (!alreadySubscribed && enablePushBtn) {
+                enablePushBtn.style.display = 'inline-flex';
+            }
+        }
+
+        // Escuchar mensajes del Service Worker (click en notificación)
+        navigator.serviceWorker?.addEventListener('message', (event) => {
+            if (event.data?.type === 'OPEN_ORDER_STATUS') {
+                selectedOrderId = event.data.orderId;
+                openOrderStatusModal();
+            }
+        });
+
+        // Si la URL tiene ?openOrder=xxx (desde notificationclick del SW)
+        const urlParams = new URLSearchParams(window.location.search);
+        const openOrderId = urlParams.get('openOrder');
+        if (openOrderId) {
+            selectedOrderId = openOrderId;
+            setTimeout(() => openOrderStatusModal(), 1200);
+        }
+    }
+
+    enablePushBtn?.addEventListener('click', async () => {
+        enablePushBtn.disabled = true;
+        enablePushBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        const result = await PushManager.subscribeToPush(supabase, 'cliente', currentUser?.id || null);
+        if (result) {
+            enablePushBtn.style.display = 'none';
+            showCustomAlert('🔔 ¡Notificaciones activadas! Te avisaremos cuando tu pedido cambie de estado.');
+        } else {
+            enablePushBtn.disabled = false;
+            enablePushBtn.innerHTML = '<i class="fas fa-bell"></i>';
+            showCustomAlert('No se pudieron activar las notificaciones. Verifica los permisos del navegador en Configuración.');
+        }
+    });
 
     // --- LÓGICA DEL CARRUSEL ---
     function nextHeroSlide() {
@@ -1160,6 +1201,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (orderError) throw orderError;
+
+            // Vincular el pedido recién creado a la suscripción push del cliente
+            if (orderId && await PushManager.isSubscribed()) {
+                await PushManager.linkOrderToPush(supabase, orderId);
+            }
 
             // Guardar dirección en perfil si el usuario está logueado y marcó el checkbox
             if (currentUser && saveAddressCheckbox?.checked) {
@@ -1773,9 +1819,22 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = session?.user || null;
         updateUserUI();
 
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabase.auth.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
             updateUserUI();
+
+            // Actualizar la suscripción push con el user_id del usuario logueado
+            if (session?.user?.id && await PushManager.isSubscribed()) {
+                const reg = await navigator.serviceWorker?.getRegistration('/');
+                if (reg) {
+                    const sub = await reg.pushManager.getSubscription();
+                    if (sub) {
+                        await supabase.from('push_subscriptions')
+                            .update({ user_id: session.user.id, role: 'cliente' })
+                            .eq('endpoint', sub.endpoint);
+                    }
+                }
+            }
         });
     }
 
@@ -1817,4 +1876,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INICIALIZACIÓN DE LA APP ---
     initialize();
+    initPWA();
+});
+
+// ── PWA Install Banner ──
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+
+    const banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.className = 'pwa-install-banner show';
+    banner.innerHTML = `
+        <div class="pwa-install-banner-text">
+            <strong>📱 Instala DeliciasExpress</strong>
+            <span>Recibe notificaciones aunque cierres el navegador</span>
+        </div>
+        <button class="pwa-install-btn" id="pwa-install-confirm">Instalar</button>
+        <button class="pwa-install-close" id="pwa-install-dismiss" aria-label="Cerrar">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    document.body.appendChild(banner);
+
+    document.getElementById('pwa-install-confirm')?.addEventListener('click', async () => {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                banner.remove();
+                setTimeout(() => PushManager.subscribeToPush(supabase, 'cliente', currentUser?.id || null), 2000);
+            }
+            deferredInstallPrompt = null;
+        }
+    });
+
+    document.getElementById('pwa-install-dismiss')?.addEventListener('click', () => banner.remove());
+});
+
+window.addEventListener('appinstalled', () => {
+    console.log('[PWA] ✅ App instalada');
+    deferredInstallPrompt = null;
 });

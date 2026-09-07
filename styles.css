@@ -1649,6 +1649,55 @@ font-size: 0.9rem;
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
     animation: flash-pulse 1.5s infinite;
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* --- RATING STARS --- */
+.rating-section {
+    text-align: center;
+    padding: 1rem;
+    background: #fff8f0;
+    border: 1px solid #ffe0b2;
+    border-radius: 0.75rem;
+}
+.rating-section h4 {
+    margin: 0 0 0.75rem;
+    color: var(--color-texto-principal);
+    font-size: 1rem;
+}
+.rating-stars {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.rating-stars .star {
+    font-size: 2rem;
+    cursor: pointer;
+    color: #ccc;
+    transition: color 0.15s, transform 0.1s;
+    user-select: none;
+}
+.rating-stars .star:hover {
+    color: #ffc107;
+    transform: scale(1.2);
+}
+.rating-thanks {
+    color: #2e7d32;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* --- FLASH OFFER BADGE --- */
+.badge-flash {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    animation: flash-pulse 1.5s infinite;
 }
 .badge-flash .flash-badge-timer {
     margin-left: 0.25rem;
@@ -1657,3 +1706,40 @@ font-size: 0.9rem;
     font-size: 0.75em;
 }
 @keyframes flash-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+
+/* ── PWA Install Banner ── */
+.pwa-install-banner {
+    display: none;
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 1px solid rgba(225, 29, 72, 0.3);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    color: white;
+    font-size: 0.875rem;
+    z-index: 9999;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    width: calc(100% - 2rem);
+    max-width: 400px;
+    gap: 1rem;
+    align-items: center;
+    backdrop-filter: blur(10px);
+}
+.pwa-install-banner.show { display: flex; }
+.pwa-install-banner-text { flex: 1; }
+.pwa-install-banner-text strong { display: block; color: #e11d48; margin-bottom: 0.25rem; }
+.pwa-install-btn {
+    background: #e11d48; color: white; border: none;
+    border-radius: 8px; padding: 0.5rem 1rem;
+    font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: background 0.2s;
+}
+.pwa-install-btn:hover { background: #be185d; }
+.pwa-install-close {
+    background: transparent; border: none;
+    color: rgba(255,255,255,0.5); cursor: pointer;
+    padding: 0.25rem; font-size: 1rem;
+}

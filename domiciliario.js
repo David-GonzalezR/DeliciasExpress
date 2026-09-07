@@ -86,6 +86,28 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard.style.display = 'none';
     }
 
+    async function initRiderPush() {
+        if (!('PushManager' in window)) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id || null;
+        const alreadySubscribed = await PushManager.isSubscribed();
+
+        if (!alreadySubscribed) {
+            const result = await PushManager.subscribeToPush(supabase, 'domiciliario', userId);
+            if (result) console.log('[Rider PWA] Notificaciones push activadas ✅');
+        } else if (userId) {
+            const reg = await navigator.serviceWorker?.getRegistration('/');
+            if (reg) {
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    await supabase.from('push_subscriptions')
+                        .update({ user_id: userId, role: 'domiciliario' })
+                        .eq('endpoint', sub.endpoint);
+                }
+            }
+        }
+    }
+
     function showDashboard() {
         loginScreen.style.display = 'none';
         dashboard.style.display = 'block';
@@ -94,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadMyDeliveries();
         subscribeToOrders();
         setInterval(pollForUpdates, 5000);
+        initRiderPush();
     }
 
     // Respaldo por polling: refresca los pedidos disponibles cada 5s aunque

@@ -364,7 +364,15 @@ img { max-width: 100%; height: auto; }
   margin-bottom: 0.8rem;
 }
 .order-card-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.order-card-actions .btn { flex: 1; padding: 0.5rem 0.6rem; font-size: 0.8rem; }
+.order-card-actions .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .btn-status-advance { background: var(--color-primario); color: #fff; }
 .btn-status-advance:hover { background: var(--color-primario-hover); }
 .order-card.status-recibido .btn-status-advance { background: #1565c0; }
@@ -422,6 +430,10 @@ img { max-width: 100%; height: auto; }
   text-align: left;
 }
 .sidebar-btn:hover { background: #f0efe9; }
+/* Scrollbar delgada/discreta para el sidebar en móvil */
+.admin-sidebar::-webkit-scrollbar { height: 4px; }
+.admin-sidebar::-webkit-scrollbar-thumb { background: var(--color-borde); border-radius: 999px; }
+.admin-sidebar { scrollbar-width: thin; scrollbar-color: var(--color-borde) transparent; }
 .sidebar-btn.active { background: var(--color-primario); color: #fff; }
 .admin-content { flex: 1; min-width: 0; }
 

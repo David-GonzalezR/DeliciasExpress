@@ -174,6 +174,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function initAdminPush() {
+        if (!('PushManager' in window)) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id || null;
+        const alreadySubscribed = await PushManager.isSubscribed();
+
+        if (!alreadySubscribed) {
+            const result = await PushManager.subscribeToPush(supabase, 'admin', userId);
+            if (result) console.log('[Admin PWA] Notificaciones push activadas ✅');
+        } else if (userId) {
+            const reg = await navigator.serviceWorker?.getRegistration('/');
+            if (reg) {
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    await supabase.from('push_subscriptions')
+                        .update({ user_id: userId, role: 'admin' })
+                        .eq('endpoint', sub.endpoint);
+                }
+            }
+        }
+    }
+
     function showDashboard() {
         loginScreen.style.display = 'none';
         dashboard.style.display = 'block';
@@ -181,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadOrders();
         subscribeToOrders();
         loadAdminProducts();
+        initAdminPush();
     }
 
     loginForm.addEventListener('submit', async (e) => {
