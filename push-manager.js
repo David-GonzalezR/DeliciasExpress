@@ -6,7 +6,7 @@ const PushManager = (() => {
   // ⚠️ REEMPLAZAR con la clave pública VAPID que generaste en el paso 0.1
   // Es la línea "Public Key: ..." del resultado de: npx web-push generate-vapid-keys
   // Esta clave NO es secreta, es seguro tenerla en el código del cliente.
-  const VAPID_PUBLIC_KEY = 'REEMPLAZAR_CON_TU_VAPID_PUBLIC_KEY';
+  const VAPID_PUBLIC_KEY = 'BLGtD5sXMITc3FooIS82m76PYENfua0k5-DmLOuIZGpflMq9nWy0-M8PGSO2sOOG7l0LoeEabSv9Qm64rQawiz8';
 
   // ── Utilidad: convertir base64url a Uint8Array (necesario para subscribe) ──
   function urlBase64ToUint8Array(base64String) {
