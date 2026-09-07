@@ -72,6 +72,12 @@
       "short_name": "Admin",
       "url": "/admin.html",
       "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Panel Domiciliario",
+      "short_name": "Domiciliario",
+      "url": "/domiciliario.html",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
     }
   ],
   "categories": ["food", "shopping"],
