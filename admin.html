@@ -43,14 +43,14 @@
                     <span class="store-toggle-slider"></span>
                     <span id="store-toggle-label" class="store-toggle-label">🟢 Abierta</span>
                 </label>
-                <div id="delay-controls" class="delay-controls" style="display:flex; align-items:center; gap:0.75rem; margin-left:1rem; padding-left:1rem; border-left:1px solid var(--color-borde);">
+                <div id="delay-controls" class="delay-controls">
                     <label class="delay-input-group" title="Minutos extra de retraso para todos los pedidos">
                         <span class="delay-input-label">⏱️ Retraso:</span>
-                        <input type="number" id="delay-minutes-input" min="0" max="120" value="0" style="width:60px; padding:0.25rem 0.5rem; font-size:0.875rem;">
+                        <input type="number" id="delay-minutes-input" min="0" max="120" value="0">
                         <span class="delay-input-unit">min</span>
                     </label>
-                    <input type="text" id="delay-message-input" placeholder="Mensaje (ej: Alta demanda)" style="width:180px; padding:0.25rem 0.5rem; font-size:0.875rem;" title="Mensaje que verá el cliente">
-                    <button id="save-delay-btn" class="btn btn-secondary" style="padding:0.25rem 0.75rem; font-size:0.8rem;">Guardar</button>
+                    <input type="text" id="delay-message-input" placeholder="Mensaje (ej: Alta demanda)" title="Mensaje que verá el cliente">
+                    <button id="save-delay-btn" class="btn btn-secondary">Guardar</button>
                 </div>
                 <span id="realtime-indicator" class="realtime-indicator"><i class="fas fa-circle"></i> En vivo</span>
                 <button id="logout-btn" class="btn btn-secondary admin-logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</button>
@@ -156,7 +156,7 @@
                         <button id="new-rider-btn" class="btn btn-primary"><i class="fas fa-motorcycle"></i> Crear domiciliario</button>
                     </div>
                     <div class="riders-promote-row">
-                        <label class="form-field" style="flex:1;">
+                        <label class="form-field">
                             Promover usuario existente (por correo)
                             <input id="rider-search-email" type="email" placeholder="correo@ejemplo.com">
                         </label>
