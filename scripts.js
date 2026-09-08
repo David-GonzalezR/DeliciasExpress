@@ -623,13 +623,14 @@ document.addEventListener('DOMContentLoaded', () => {
         enablePushBtn.disabled = true;
         enablePushBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         const result = await PushManager.subscribeToPush(supabase, 'cliente', currentUser?.id || null);
-        if (result) {
+        if (result && !result.error) {
             enablePushBtn.style.display = 'none';
             showCustomAlert('🔔 ¡Notificaciones activadas! Te avisaremos cuando tu pedido cambie de estado.');
         } else {
             enablePushBtn.disabled = false;
             enablePushBtn.innerHTML = '<i class="fas fa-bell"></i>';
-            showCustomAlert('No se pudieron activar las notificaciones. Verifica los permisos del navegador en Configuración.');
+            const msg = result?.error || 'No se pudieron activar las notificaciones.';
+            showCustomAlert(msg);
         }
     });
 

@@ -32,35 +32,59 @@ const PushManager = (() => {
     }
   }
 
-  // ── Pedir permiso de notificaciones ──────────────────────────────────────
+  // ── Pedir permiso de notificaciones ──────────────────────────────────
   async function requestPermission() {
     if (!('Notification' in window)) {
       console.warn('[PWA] Notificaciones no soportadas en este navegador');
-      return 'denied';
+      return { status: 'unsupported', reason: 'Tu navegador no soporta notificaciones.' };
     }
-    if (Notification.permission === 'granted') return 'granted';
-    if (Notification.permission === 'denied')  return 'denied';
-    const result = await Notification.requestPermission();
-    return result; // 'granted' | 'denied' | 'default'
+    if (Notification.permission === 'denied') {
+      return {
+        status: 'denied',
+        reason:
+          'Ya habías bloqueado las notificaciones. Para activarlas:\n' +
+          '1. Toca el ícono del candado (🔒) en la barra de la URL.\n' +
+          '2. Entra a "Permisos del sitio".\n' +
+          '3. Cambia "Notificaciones" a "Permitir".\n' +
+          '4. Recarga la página y vuelve a intentarlo.',
+      };
+    }
+    if (Notification.permission === 'granted') return { status: 'granted', reason: '' };
+    try {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') return { status: 'granted', reason: '' };
+      return { status: result, reason: 'Permiso no concedido. Intenta de nuevo o revisa la configuración del navegador.' };
+    } catch (err) {
+      console.error('[PWA] Error al solicitar permiso:', err);
+      return { status: 'error', reason: `Error al solicitar permiso: ${err.message}` };
+    }
   }
 
   // ── Suscribir al Push y guardar en Supabase ───────────────────────────────
+  // Retorna: { subscription, record } si OK
+  //          { error: string } si falla (para que el caller muestre el mensaje correcto)
   async function subscribeToPush(supabaseClient, role = 'cliente', userId = null) {
     if (VAPID_PUBLIC_KEY === 'REEMPLAZAR_CON_TU_VAPID_PUBLIC_KEY') {
       console.error('[PWA] ⚠️ La clave VAPID_PUBLIC_KEY no ha sido configurada en push-manager.js');
       return null;
     }
 
-    const permission = await requestPermission();
-    if (permission !== 'granted') {
-      console.log('[PWA] Permiso de notificaciones denegado por el usuario');
-      return null;
+    const permResult = await requestPermission();
+    if (permResult.status !== 'granted') {
+      console.warn('[PWA] Permiso no concedido:', permResult.reason);
+      return { error: permResult.reason };
     }
 
     // Asegurar que el SW esté registrado y listo
-    const registration = await registerServiceWorker();
-    if (!registration) return null;
-    await navigator.serviceWorker.ready;
+    let registration;
+    try {
+      registration = await registerServiceWorker();
+      if (!registration) throw new Error('No se pudo registrar el Service Worker.');
+      await navigator.serviceWorker.ready;
+    } catch (err) {
+      console.error('[PWA] Error con Service Worker:', err);
+      return { error: `Error interno del Service Worker: ${err.message}` };
+    }
 
     // Intentar suscribirse al push
     let subscription;
@@ -70,8 +94,15 @@ const PushManager = (() => {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
     } catch (err) {
-      console.error('[PWA] Error al suscribirse al Push Manager:', err);
-      return null;
+      console.error('[PWA] Error al suscribirse al Push Manager:', err.name, err.message);
+      // Diagnóstico específico
+      let msg = `Error al suscribirse: ${err.name} — ${err.message}`;
+      if (err.name === 'AbortError') {
+        msg = 'El navegador canceló la suscripción. Asegúrate de que Chrome esté actualizado y que el sitio sea HTTPS.';
+      } else if (err.name === 'NotAllowedError') {
+        msg = 'El permiso de notificaciones fue bloqueado. Sigue los pasos de la configuración del navegador para habilitarlo.';
+      }
+      return { error: msg };
     }
 
     const subJson = subscription.toJSON();
@@ -81,11 +112,11 @@ const PushManager = (() => {
 
     if (!endpoint || !p256dh || !auth) {
       console.error('[PWA] Suscripción incompleta (falta endpoint, p256dh o auth)');
-      return null;
+      return { error: 'Suscripción push incompleta. Intenta desde otro navegador.' };
     }
 
     // Guardar / actualizar en Supabase
-    const { data, error } = await supabaseClient
+    const { data, error: dbError } = await supabaseClient
       .from('push_subscriptions')
       .upsert(
         {
@@ -101,9 +132,9 @@ const PushManager = (() => {
       .select()
       .single();
 
-    if (error) {
-      console.error('[PWA] Error guardando suscripción en Supabase:', error);
-      return null;
+    if (dbError) {
+      console.error('[PWA] Error guardando suscripción en Supabase:', dbError);
+      return { error: `Error de base de datos: ${dbError.message}` };
     }
 
     console.log('[PWA] ✅ Suscripción push guardada exitosamente. Role:', role);

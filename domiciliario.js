@@ -94,7 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!alreadySubscribed) {
             const result = await PushManager.subscribeToPush(supabase, 'domiciliario', userId);
-            if (result) console.log('[Rider PWA] Notificaciones push activadas ✅');
+            if (result && !result.error) {
+                console.log('[Rider PWA] Notificaciones push activadas ✅');
+            } else if (result?.error) {
+                console.warn('[Rider PWA] Push no activado:', result.error);
+            }
         } else if (userId) {
             const reg = await navigator.serviceWorker?.getRegistration('/');
             if (reg) {

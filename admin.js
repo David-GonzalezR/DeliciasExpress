@@ -182,7 +182,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!alreadySubscribed) {
             const result = await PushManager.subscribeToPush(supabase, 'admin', userId);
-            if (result) console.log('[Admin PWA] Notificaciones push activadas ✅');
+            if (result && !result.error) {
+                console.log('[Admin PWA] Notificaciones push activadas ✅');
+            } else if (result?.error) {
+                console.warn('[Admin PWA] Push no activado:', result.error);
+            }
         } else if (userId) {
             const reg = await navigator.serviceWorker?.getRegistration('/');
             if (reg) {
