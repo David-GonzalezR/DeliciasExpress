@@ -47,10 +47,21 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const target = event.notification.data && event.notification.data.url ? event.notification.data.url : './index.html';
+  const nd = event.notification.data || {};
+  let target = nd.url || './index.html';
+  const orderId = nd.orderId;
+
+  if (orderId) {
+    const separator = target.includes('?') ? '&' : '?';
+    target = `${target}${separator}order=${encodeURIComponent(orderId)}`;
+  }
+
   event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     for (const client of list) {
-      if ('focus' in client) { client.navigate(target); return client.focus(); }
+      if ('focus' in client) {
+        client.navigate(target);
+        return client.focus();
+      }
     }
     return clients.openWindow(target);
   }));

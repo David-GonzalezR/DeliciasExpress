@@ -23,10 +23,12 @@
     wrap.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:9999;display:flex;gap:8px;flex-direction:column;align-items:flex-start;';
     wrap.innerHTML = `
       <button id="pwa-install-btn" type="button" style="display:none;border:0;border-radius:999px;padding:11px 15px;background:#111;color:#fff;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.2);cursor:pointer;">📲 Instalar app</button>
-      <button id="pwa-push-btn" type="button" style="display:none;border:0;border-radius:999px;padding:11px 15px;background:#e63946;color:#fff;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.2);cursor:pointer;">🔔 Activar notificaciones</button>`;
+      <button id="pwa-push-btn" type="button" style="display:none;border:0;border-radius:999px;padding:11px 15px;background:#e63946;color:#fff;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.2);cursor:pointer;">🔔 Activar notificaciones</button>
+      <button id="pwa-diagnostic-btn" type="button" style="display:none;border:0;border-radius:999px;padding:11px 15px;background:#6c757d;color:#fff;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.2);cursor:pointer;">🔧 Diagnosticar Push</button>`;
     document.body.appendChild(wrap);
     document.getElementById('pwa-install-btn').addEventListener('click', installPwa);
     document.getElementById('pwa-push-btn').addEventListener('click', enablePush);
+    document.getElementById('pwa-diagnostic-btn').addEventListener('click', showPushDiagnostic);
   }
 
   async function installPwa() {
@@ -45,9 +47,16 @@
     return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
   }
 
+  function getCurrentStorageKey() {
+    const path = (window.location.pathname || '').toLowerCase();
+    if (path.includes('domiciliario')) return 'deliciasexpress-rider-auth';
+    if (path.includes('admin')) return 'deliciasexpress-admin-auth';
+    return 'deliciasexpress-client-auth';
+  }
+
   async function getSupabaseClient() {
     if (!window.supabase) return null;
-    return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'deliciasexpress-client-auth' } });
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: getCurrentStorageKey() } });
   }
 
   async function getVapidPublicKey() {
@@ -117,6 +126,67 @@
     }
   }
 
+  async function showPushDiagnostic() {
+    const btn = document.getElementById('pwa-diagnostic-btn');
+    btn.disabled = true;
+    btn.textContent = '🔧 Diagnóstico...';
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      const client = await getSupabaseClient();
+      let sessionData = null;
+      let userRole = null;
+      let dbSubscribed = false;
+
+      if (client) {
+        sessionData = await client.auth.getSession();
+        if (sessionData?.session?.user?.id) {
+          const { data: roleData } = await client.rpc('get_user_role');
+          userRole = roleData || null;
+        }
+      }
+
+      if (client && subscription) {
+        const { data: subs } = await client
+          .from('push_subscriptions')
+          .select('endpoint')
+          .eq('endpoint', subscription.endpoint)
+          .maybeSingle();
+        dbSubscribed = !!subs;
+      }
+
+      let vapidOk = false;
+      try {
+        const resp = await fetch(VAPID_URL, { cache: 'no-store' });
+        const data = await resp.json();
+        vapidOk = !!data?.publicKey;
+      } catch (_) {}
+
+      const lines = [
+        `Notification.permission: ${Notification.permission}`,
+        `Service Worker: ${registration.active ? 'ACTIVO' : registration.installing ? 'INSTALANDO' : registration.waiting ? 'ESPERANDO' : 'NO REGISTRADO'}`,
+        `Service Worker scope: ${registration.scope}`,
+        `PushSubscription: ${subscription ? 'EXISTE' : 'NO EXISTE'}`,
+        subscription ? `  Endpoint: ${subscription.endpoint.slice(0, 50)}...` : '',
+        subscription ? `  p256dh: ${subscription.toJSON().keys?.p256dh ? 'SÍ' : 'NO'}` : '',
+        subscription ? `  auth: ${subscription.toJSON().keys?.auth ? 'SÍ' : 'NO'}` : '',
+        `VAPID pública: ${vapidOk ? 'DISPONIBLE' : 'NO DISPONIBLE'}`,
+        `Usuario autenticado: ${sessionData?.session?.user?.id ? 'SÍ (' + sessionData.session.user.id.slice(0, 8) + '...)' : 'NO (anónimo)'}`,
+        `Rol: ${userRole || 'desconocido'}`,
+        `Suscripción en BD: ${dbSubscribed ? 'REGISTRADA' : 'NO REGISTRADA'}`
+      ].filter(Boolean);
+
+      alert('🔧 DIAGNÓSTICO PUSH\n\n' + lines.join('\n'));
+    } catch (error) {
+      console.error('[Push Diagnostic]', error);
+      alert(`Error en diagnóstico: ${error.message || error}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔧 Diagnosticar Push';
+    }
+  }
+
   async function linkOrder(orderId) {
     try {
       const client = await getSupabaseClient();
@@ -152,6 +222,7 @@
     createPwaControls();
     await registerServiceWorker();
     const pushBtn = document.getElementById('pwa-push-btn');
+    const diagBtn = document.getElementById('pwa-diagnostic-btn');
     if (pushBtn && 'Notification' in window && 'PushManager' in window) {
       try {
         const registration = await navigator.serviceWorker.ready;
@@ -171,6 +242,7 @@
             pushBtn.textContent = '🔔 Permitir notificaciones en Chrome';
           }
         }
+        if (diagBtn) diagBtn.style.display = 'block';
       } catch (_) {}
     }
   });
