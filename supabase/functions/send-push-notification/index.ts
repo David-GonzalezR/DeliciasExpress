@@ -77,8 +77,20 @@ serve(async(req)=>{
       const {data:anon}=await supabase.from("push_subscriptions").select("endpoint,p256dh,auth").contains("order_ids",[id]);if(anon)clientSubs.push(...anon);
       const unique=Array.from(new Map(clientSubs.map(s=>[s.endpoint,s])).values()); if(unique.length)await sendPush(unique,payload);
       if(status==="buscando_domiciliario"){
-        const {data:riders}=await supabase.from("riders").select("id").eq("is_available",true); const ids=(riders||[]).map(r=>r.id).filter(Boolean); const riderSubs=await subscriptionsForUserIds(ids);
-        if(riderSubs.length)await sendPush(riderSubs,{title:"🛵 Nuevo pedido disponible",body:`Pedido #${shortId} listo para tomar`,icon:"/icon-192.png",badge:"/icon-192.png",tag:`rider-order-${id}`,renotify:true,data:{url:"/domiciliario.html",orderId:id}});
+        // Estrategia 1: riders disponibles con push subscription
+        const {data:availableRiders}=await supabase.from("riders").select("id").eq("is_available",true);
+        const availableIds=(availableRiders||[]).map((r:any)=>r.id).filter(Boolean);
+        let riderSubs:any[]=[];
+        if(availableIds.length){
+          const {data:subs}=await supabase.from("push_subscriptions").select("endpoint,p256dh,auth").in("user_id",availableIds);
+          if(subs?.length) riderSubs=subs;
+        }
+        // Estrategia 2 (fallback): notificar a TODOS los domiciliarios suscritos
+        if(!riderSubs.length){
+          const {data:allRiderSubs}=await supabase.from("push_subscriptions").select("endpoint,p256dh,auth").eq("role","domiciliario");
+          if(allRiderSubs?.length) riderSubs=allRiderSubs;
+        }
+        if(riderSubs.length) await sendPush(riderSubs,{title:"🛵 Nuevo pedido disponible",body:`Pedido #${shortId} listo para tomar`,icon:"/icon-192.png",badge:"/icon-192.png",tag:`rider-order-${id}`,renotify:true,data:{url:"/domiciliario.html",orderId:id}});
       }
     }
     return new Response(JSON.stringify({ok:true}),{status:200,headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*"}});
