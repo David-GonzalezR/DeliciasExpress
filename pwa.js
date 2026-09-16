@@ -73,12 +73,13 @@
     if (!json.endpoint || !keys.p256dh || !keys.auth) throw new Error('La suscripción del navegador está incompleta');
     const client = await getSupabaseClient();
     if (!client) throw new Error('Supabase no está disponible');
-    const { data: sessionData } = await client.auth.getSession();
-    const userId = sessionData?.session?.user?.id || null;
+    const { data } = await client.auth.getSession();
+    const session = data?.session || null;
+    const userId = session?.user?.id || null;
     let role = 'cliente';
     if (userId) {
       const { data: userRole, error: roleError } = await client.rpc('get_user_role');
-      if (roleError) throw roleError;
+      if (roleError) console.warn('[PWA] Error obteniendo rol:', roleError);
       if (userRole) role = userRole;
     }
     const { data: saved, error } = await client.rpc('register_push_subscription', {
@@ -140,8 +141,9 @@
       let dbSubscribed = false;
 
       if (client) {
-        sessionData = await client.auth.getSession();
-        if (sessionData?.session?.user?.id) {
+        const { data } = await client.auth.getSession();
+        sessionData = data?.session || null;
+        if (sessionData?.user?.id) {
           const { data: roleData } = await client.rpc('get_user_role');
           userRole = roleData || null;
         }
@@ -172,7 +174,7 @@
         subscription ? `  p256dh: ${subscription.toJSON().keys?.p256dh ? 'SÍ' : 'NO'}` : '',
         subscription ? `  auth: ${subscription.toJSON().keys?.auth ? 'SÍ' : 'NO'}` : '',
         `VAPID pública: ${vapidOk ? 'DISPONIBLE' : 'NO DISPONIBLE'}`,
-        `Usuario autenticado: ${sessionData?.session?.user?.id ? 'SÍ (' + sessionData.session.user.id.slice(0, 8) + '...)' : 'NO (anónimo)'}`,
+        `Usuario autenticado: ${sessionData?.user?.id ? 'SÍ (' + sessionData.user.id.slice(0, 8) + '...)' : 'NO (anónimo)'}`,
         `Rol: ${userRole || 'desconocido'}`,
         `Suscripción en BD: ${dbSubscribed ? 'REGISTRADA' : 'NO REGISTRADA'}`
       ].filter(Boolean);
